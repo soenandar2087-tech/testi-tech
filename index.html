@@ -116,6 +116,7 @@
 
     async function predictLoop() {
         if (isActive) {
+            // Lakukan deteksi
             const prediction = await model.predict(video);
             prediction.sort((a, b) => b.probability - a.probability);
             const res = prediction[0];
@@ -128,7 +129,13 @@
                 labelContainer.innerHTML = "🔍 MENCARI OBJEK...";
                 labelContainer.className = "label-status";
             }
-            requestAnimationFrame(predictLoop);
+
+            // PERUBAHAN UTAMA DI SINI:
+            // Kita beri jeda 250ms (0.25 detik) sebelum deteksi berikutnya.
+            // Ini membuat HP jauh lebih dingin dan aplikasi lebih stabil.
+            setTimeout(() => {
+                requestAnimationFrame(predictLoop);
+            }, 250); 
         }
     }
 
