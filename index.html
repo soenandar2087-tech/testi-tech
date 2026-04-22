@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sawit AI v2.6</title>
+    <title>Sawit AI v2.7 Fixed Mobile</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
@@ -13,40 +13,54 @@
         body, html { 
             height: 100%; width: 100%; background: var(--bg); 
             overflow: hidden; font-family: sans-serif; color: white;
+            position: fixed; /* Mencegah bouncing/scroll ditarik di HP */
         }
 
-        /* Container menggunakan posisi fixed agar kamera bisa ditarik maksimal */
         .app-container {
-            position: fixed; inset: 0;
-            display: flex; flex-direction: column;
+            /* Menggunakan dvh agar akurat dengan bar navigasi HP */
+            height: 100dvh; 
+            width: 100%;
+            display: flex; 
+            flex-direction: column;
+            overflow: hidden;
         }
 
         .top-bar {
-            width: 100%; padding: 15px 20px; display: flex; 
-            justify-content: space-between; align-items: center; z-index: 10;
+            width: 100%; padding: 12px 20px; display: flex; 
+            justify-content: space-between; align-items: center; 
+            background: rgba(0,0,0,0.5); z-index: 10;
         }
 
-        /* Area Kamera yang Diperbaiki */
+        /* Area Kamera - Diperketat agar tidak ada gap */
         #webcam-container { 
-            flex: 1; /* Mengambil semua ruang sisa termasuk area kuning tadi */
-            width: 100%; 
-            background: #111; 
-            overflow: hidden;
+            flex: 1; /* Paksa ambil sisa layar */
+            width: 100%;
             position: relative;
+            background: #000;
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow: hidden;
         }
         
+        /* Kunci utama: object-fit cover dan tinggi 100% */
         canvas { 
+            position: absolute;
+            top: 0; left: 0;
             width: 100% !important; 
             height: 100% !important; 
-            object-fit: cover !important; /* Menutup seluruh area hitam */
+            object-fit: cover !important; 
         }
 
         .bottom-panel {
-            width: 100%; padding: 20px; display: flex; flex-direction: column; 
-            align-items: center; gap: 15px; background: #000; z-index: 10;
+            width: 100%; 
+            padding: 15px 10px 25px 10px; /* Padding bawah lebih besar untuk HP layar poni */
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 12px; 
+            background: #000;
+            z-index: 10;
         }
 
         .label-status { 
@@ -58,8 +72,9 @@
         .label-matang { background: #1b3d1d; border-color: #4caf50; color: #c8e6c9; }
 
         .btn-capture { 
-            width: 70px; height: 70px; background: white; border: 5px solid #333;
+            width: 65px; height: 65px; background: white; border: 4px solid #333;
             border-radius: 50%; cursor: pointer;
+            box-shadow: 0 0 10px rgba(255,255,255,0.2);
         }
 
         /* Preview Overlay */
@@ -81,21 +96,22 @@
 
 <div id="welcome-screen">
     <h2 style="color:#333; margin-bottom:20px;">🌴 Sawit AI</h2>
-    <button onclick="startApp()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold;">MULAI</button>
+    <button onclick="startApp()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold;">MULAI SCAN</button>
 </div>
 
 <div class="app-container">
     <div class="top-bar">
-        <span style="font-weight: bold; font-size: 13px; color: #666;">SCANNER v2.6</span>
-        <button onclick="location.reload()" style="background:none; border:none; color:#666;">Reset</button>
+        <span style="font-weight: bold; font-size: 12px; color: #888;">SCANNER v2.7 (Mobile Fix)</span>
+        <button onclick="location.reload()" style="background:none; border:none; color:#888; font-size: 12px;">Reset</button>
     </div>
 
-    <div id="webcam-container"></div>
+    <div id="webcam-container">
+        </div>
 
     <div class="bottom-panel">
-        <div id="label-container" class="label-status">Mencari...</div>
+        <div id="label-container" class="label-status">Menunggu...</div>
         <button class="btn-capture" onclick="captureImage()"></button>
-        <p style="font-size: 10px; color: #555;">Posisikan buah di tengah kotak</p>
+        <p style="font-size: 10px; color: #444;">Pastikan cahaya cukup</p>
     </div>
 </div>
 
@@ -116,13 +132,17 @@
         labelContainer = document.getElementById("label-container");
         try {
             model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-            // Menggunakan resolusi 640x480 agar lebih tajam di layar panjang
-            webcam = new tmImage.Webcam(480, 640, false); 
+            
+            // Menggunakan resolusi tinggi agar saat di 'cover' tidak pecah
+            webcam = new tmImage.Webcam(innerWidth, innerHeight, false); 
             await webcam.setup({ facingMode: "environment" }); 
             await webcam.play();
-            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            
+            const container = document.getElementById("webcam-container");
+            container.appendChild(webcam.canvas);
+            
             runAI();
-        } catch (e) { alert("Error Kamera: " + e); }
+        } catch (e) { alert("Akses Kamera Ditolak/Gagal: " + e); }
     }
 
     async function runAI() {
@@ -138,7 +158,7 @@
         prediction.sort((a, b) => b.probability - a.probability);
         const res = prediction[0];
 
-        if (res.probability > 0.8) {
+        if (res.probability > 0.75) {
             labelContainer.innerHTML = `${res.className.toUpperCase()} (${(res.probability * 100).toFixed(0)}%)`;
             const label = res.className.toLowerCase();
             if (label.includes("mentah")) labelContainer.className = "label-status label-mentah";
@@ -154,6 +174,7 @@
         const canvas = document.getElementById("preview-canvas");
         const ctx = canvas.getContext("2d");
         
+        // Gunakan ukuran asli kamera untuk hasil simpan
         canvas.width = webcam.canvas.width;
         canvas.height = webcam.canvas.height;
         ctx.drawImage(webcam.canvas, 0, 0);
@@ -163,18 +184,18 @@
         const jam = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const timeStamp = `${tgl} | ${jam}`;
 
-        const h = 55; 
+        const h = 60; 
         ctx.fillStyle = "rgba(0,0,0,0.7)";
         ctx.fillRect(0, canvas.height - h, canvas.width, h);
         
         ctx.fillStyle = "white";
         ctx.textAlign = "center";
         ctx.font = "bold 16px sans-serif";
-        ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 32);
+        ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 35);
 
         ctx.font = "normal 12px sans-serif";
         ctx.fillStyle = "#ccc"; 
-        ctx.fillText(timeStamp, canvas.width/2, canvas.height - 12);
+        ctx.fillText(timeStamp, canvas.width/2, canvas.height - 15);
 
         document.getElementById("preview-overlay").style.display = "flex";
     }
