@@ -3,235 +3,185 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AI Detektor Sawit Pro - Portrait - Fix Area Hitam & Font</title>
+    <title>Sawit AI Compact</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
+        :root { --accent: #1a73e8; --bg: #000; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body, html { 
-            height: 100%; width: 100%; 
-            background: #000; overflow: hidden; 
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100%; width: 100%; background: var(--bg); 
+            overflow: hidden; font-family: sans-serif; color: white;
         }
 
-        /* Container utama mengikuti tinggi dinamis HP */
         .app-container {
-            height: 100dvh;
-            display: flex;
-            flex-direction: column;
-            position: relative;
+            height: 100dvh; display: flex; flex-direction: column;
+            justify-content: space-between; align-items: center;
         }
 
-        /* Background Kamera Full Screen */
+        /* Top Header */
+        .top-bar {
+            width: 100%; padding: 15px 20px; display: flex; 
+            justify-content: space-between; align-items: center; z-index: 10;
+        }
+        .btn-exit { background: none; border: none; color: #ccc; font-size: 14px; }
+
+        /* Camera Viewport - Menjaga Rasio Original 3:4 */
         #webcam-container { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            z-index: 1; background: #222;
+            width: 95%; max-width: 400px; aspect-ratio: 3 / 4;
+            background: #111; border-radius: 12px; overflow: hidden;
+            position: relative; border: 1px solid #333;
         }
-        
-        #webcam-container canvas {
-            width: 100% !important; height: 100% !important;
-            object-fit: cover; /* Penting agar full screen tanpa area hitam */
+        canvas { width: 100% !important; height: 100% !important; object-fit: contain; }
+
+        /* Bottom Controls Container */
+        .bottom-panel {
+            width: 100%; padding: 20px; display: flex; flex-direction: column; 
+            align-items: center; gap: 15px; background: #000;
         }
 
-        /* Tombol Keluar Melayang */
-        .btn-exit { 
-            position: absolute; top: 20px; left: 20px;
-            padding: 10px 18px; background: rgba(0,0,0,0.5); 
-            color: white; border: 1px solid rgba(255,255,255,0.3); 
-            border-radius: 50px; z-index: 10; backdrop-filter: blur(8px);
-            font-weight: bold; cursor: pointer;
+        .label-status { 
+            width: 100%; max-width: 320px; padding: 12px; border-radius: 8px;
+            font-size: 14px; font-weight: bold; text-align: center;
+            background: #222; border: 1px solid #333; transition: 0.3s;
         }
-
-        /* UI Panel Bawah */
-        .ui-overlay {
-            position: absolute; bottom: 0; left: 0; width: 100%; 
-            padding: 30px 20px calc(25px + env(safe-area-inset-bottom));
-            background: linear-gradient(transparent, rgba(0,0,0,0.9));
-            z-index: 5; display: flex; flex-direction: column; gap: 15px;
-        }
-
-        .label-box { 
-            padding: 20px; border-radius: 15px; font-size: 1.3em; 
-            font-weight: bold; text-align: center; color: white;
-            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);
-            transition: 0.3s;
-        }
-        .label-default { background: rgba(255,255,255,0.2); }
-        .label-mentah { background: rgba(211, 47, 47, 0.9); border-color: #ff5252; }
-        .label-matang { background: rgba(46, 125, 50, 0.9); border-color: #66bb6a; }
+        .label-mentah { background: #641515; border-color: #f44336; color: #ffcdd2; }
+        .label-matang { background: #1b3d1d; border-color: #4caf50; color: #c8e6c9; }
 
         .btn-capture { 
-            width: 100%; padding: 20px; background: white; color: black; 
-            border: none; border-radius: 15px; font-weight: bold; font-size: 1.1em;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+            width: 70px; height: 70px; background: white; border: 5px solid #333;
+            border-radius: 50%; cursor: pointer; display: flex; align-items: center; 
+            justify-content: center; position: relative;
+        }
+        .btn-capture::after {
+            content: ''; width: 50px; height: 50px; border: 2px solid black; border-radius: 50%;
         }
 
-        /* Overlay Preview (Setelah Ambil Gambar) */
+        /* Preview Overlay */
         #preview-overlay {
-            display: none; position: fixed; inset: 0;
-            background: #000; z-index: 100; flex-direction: column;
+            display: none; position: fixed; inset: 0; background: #000; z-index: 100;
+            flex-direction: column; align-items: center; justify-content: center; padding: 20px;
         }
-        
-        /* Area Canvas diperluas */
-        #preview-canvas { width: 100%; height: calc(100% - 100px); object-fit: contain; background: #111; }
-        
-        /* Footer dipersempit */
-        .preview-footer { padding: 15px 25px 25px; display: flex; gap: 10px; background: #1a1a1a; height: 100px; }
-        .btn-action { flex: 1; padding: 18px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; }
+        #preview-canvas { 
+            width: 100%; max-width: 350px; border-radius: 8px; 
+            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+        }
+        .preview-btns { margin-top: 20px; display: flex; gap: 10px; width: 100%; max-width: 350px; }
+        .btn-p { flex: 1; padding: 14px; border-radius: 8px; border: none; font-weight: bold; }
 
-        /* Layar Awal */
+        /* Welcome */
         #welcome-screen {
             position: fixed; inset: 0; background: white; z-index: 200;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            padding: 40px; text-align: center;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px;
         }
     </style>
 </head>
 <body>
 
 <div id="welcome-screen">
-    <div style="font-size: 5em; margin-bottom: 20px;">🌴</div>
-    <h1 style="color: #1a73e8;">Sortasi Sawit AI</h1>
-    <p style="color: #666; margin: 15px 0 35px;">Versi Mobile Portrait & Performa Ringan - Fix Area Hitam & Font</p>
-    <button onclick="startApp()" style="width:100%; max-width:300px; padding:20px; background:#1a73e8; color:white; border:none; border-radius:15px; font-weight:bold; font-size:1.1em;">BUKA KAMERA</button>
+    <h2 style="color: #333; margin-bottom: 20px;">🌴 Sawit Detector</h2>
+    <button onclick="startApp()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold;">MULAI</button>
 </div>
 
 <div class="app-container">
-    <button class="btn-exit" onclick="location.reload()">← Keluar</button>
+    <div class="top-bar">
+        <span style="font-weight: bold; font-size: 14px; color: #666;">SCANNER v2.1</span>
+        <button class="btn-exit" onclick="location.reload()">Reset</button>
+    </div>
+
     <div id="webcam-container"></div>
-    <div class="ui-overlay">
-        <div id="label-container" class="label-box label-default">Menyiapkan AI...</div>
-        <button class="btn-capture" id="main-capture-btn" onclick="captureImage()">📸 AMBIL GAMBAR</button>
+
+    <div class="bottom-panel">
+        <div id="label-container" class="label-status">Menunggu Kamera...</div>
+        <button class="btn-capture" onclick="captureImage()"></button>
+        <p style="font-size: 10px; color: #555;">Posisikan buah di tengah kotak</p>
     </div>
 </div>
 
 <div id="preview-overlay">
     <canvas id="preview-canvas"></canvas>
-    <div class="preview-footer">
-        <button class="btn-action" onclick="closePreview()" style="background:#444; color:white;">🔄 ULANGI</button>
-        <button class="btn-action" onclick="saveImage()" style="background:#17a2b8; color:white;">💾 SIMPAN</button>
+    <div class="preview-btns">
+        <button class="btn-p" onclick="closePreview()" style="background:#333; color:white;">ULANGI</button>
+        <button class="btn-p" onclick="saveImage()" style="background:var(--accent); color:white;">SIMPAN</button>
     </div>
 </div>
 
 <script>
     const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZkvJoTy22/";
-    let model, webcam, labelContainer;
-    let isPaused = false;
+    let model, webcam, labelContainer, isPaused = false;
 
     async function startApp() {
         document.getElementById('welcome-screen').style.display = 'none';
         labelContainer = document.getElementById("label-container");
-        await initAI();
-    }
-
-    async function initAI() {
         try {
-            // Load model AI
             model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-            
-            // Setup webcam dengan resolusi portrait
-            webcam = new tmImage.Webcam(480, 640, false); 
+            // Menggunakan 320x426 (rasio 3:4) agar ringan dan tidak distorsi
+            webcam = new tmImage.Webcam(320, 426, false); 
             await webcam.setup({ facingMode: "environment" }); 
             await webcam.play();
-
             document.getElementById("webcam-container").appendChild(webcam.canvas);
-            
-            // Mulai loop prediksi
             runAI();
-        } catch (e) {
-            alert("Gagal Membuka Kamera: " + e + "\nPastikan menggunakan HTTPS.");
-            location.reload();
-        }
+        } catch (e) { alert("Error: " + e); }
     }
 
     async function runAI() {
         if (!isPaused) {
             webcam.update();
             await predict();
-            // JEDA 150ms agar CPU HP tidak panas (mencegah lag)
-            setTimeout(() => {
-                requestAnimationFrame(runAI);
-            }, 150);
+            setTimeout(() => requestAnimationFrame(runAI), 100);
         }
     }
 
     async function predict() {
         const prediction = await model.predict(webcam.canvas);
         prediction.sort((a, b) => b.probability - a.probability);
-
         const res = prediction[0];
-        const THRESHOLD = 0.80;
 
-        if (res.probability > THRESHOLD) {
-            const label = res.className;
-            const score = (res.probability * 100).toFixed(0);
-            labelContainer.innerHTML = `${label} (${score}%)`;
-            
-            if (label.toLowerCase().includes("mentah")) {
-                labelContainer.className = "label-box label-mentah";
-            } else if (label.toLowerCase().includes("matang") || label.toLowerCase().includes("masak")) {
-                labelContainer.className = "label-box label-matang";
-            }
+        if (res.probability > 0.8) {
+            labelContainer.innerHTML = `${res.className.toUpperCase()} (${(res.probability * 100).toFixed(0)}%)`;
+            const label = res.className.toLowerCase();
+            if (label.includes("mentah")) labelContainer.className = "label-status label-mentah";
+            else if (label.includes("matang") || label.includes("masak")) labelContainer.className = "label-status label-matang";
         } else {
-            labelContainer.innerHTML = "🔍 Mencari Objek...";
-            labelContainer.className = "label-box label-default";
+            labelContainer.innerHTML = "🔍 MENCARI OBJEK...";
+            labelContainer.className = "label-status";
         }
     }
 
     function captureImage() {
-        isPaused = true; // Hentikan AI loop
-        
+        isPaused = true;
         const canvas = document.getElementById("preview-canvas");
         const ctx = canvas.getContext("2d");
         
-        // Portrait High Resolution untuk simpan
-        canvas.width = 720;
-        canvas.height = 1280;
+        // Simpan dalam resolusi asli tanpa ditarik-tarik
+        canvas.width = webcam.canvas.width;
+        canvas.height = webcam.canvas.height;
+        ctx.drawImage(webcam.canvas, 0, 0);
         
-        // Gambar dari webcam ke canvas preview
-        ctx.drawImage(webcam.canvas, 0, 0, canvas.width, canvas.height);
+        // Watermark Minimalis & Proporsional
+        const h = 40; // Tinggi area hitam sangat kecil
+        ctx.fillStyle = "rgba(0,0,0,0.7)";
+        ctx.fillRect(0, canvas.height - h, canvas.width, h);
         
-        // Watermark Hitam Transparan - Jauh lebih sempit
-        const watermarkHeight = 150; // Tinggi area watermark
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.fillRect(0, canvas.height - watermarkHeight, canvas.width, watermarkHeight);
-        
-        // Atur perataan teks ke tengah (SIMETRIS)
-        ctx.textAlign = "center";
-        
-        // Teks Hasil - Font lebih besar
         ctx.fillStyle = "white";
-        ctx.font = "bold 56px Arial"; // Ukuran font diperbesar
-        // Posisikan teks hasil di tengah secara horizontal dan vertikal
-        ctx.fillText(`HASIL: ${labelContainer.innerText}`, canvas.width / 2, canvas.height - watermarkHeight / 2 - 10);
-        
-        // Teks Tanggal - Font lebih besar
-        const tgl = new Date().toLocaleString('id-ID');
-        ctx.font = "32px Arial"; // Ukuran font diperbesar
-        ctx.fillStyle = "#ccc";
-        // Posisikan teks tanggal di bawah teks hasil, masih di tengah secara horizontal
-        ctx.fillText(`Waktu: ${tgl} | AI Detector`, canvas.width / 2, canvas.height - watermarkHeight / 2 + 50);
-
-        // Atur kembali perataan teks ke kiri untuk penggunaan di luar watermark jika diperlukan
-        ctx.textAlign = "left";
+        ctx.textAlign = "center";
+        ctx.font = "bold 14px sans-serif"; // Ukuran teks proporsional
+        ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 15);
 
         document.getElementById("preview-overlay").style.display = "flex";
     }
 
     function closePreview() {
-        // Sembunyikan preview
         document.getElementById("preview-overlay").style.display = "none";
-        // Jalankan kembali AI
         isPaused = false;
         runAI();
     }
 
     function saveImage() {
         const link = document.createElement('a');
-        const time = new Date().getTime();
-        link.download = `Sawit_AI_${time}.png`;
-        link.href = document.getElementById("preview-canvas").toDataURL("image/png");
+        link.download = `Sawit_${Date.now()}.png`;
+        link.href = document.getElementById("preview-canvas").toDataURL();
         link.click();
     }
 </script>
