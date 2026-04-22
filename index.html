@@ -3,262 +3,147 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AI Detektor Buah Sawit Pro</title>
+    <title>Sortasi Sawit AI - Fix</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
+        body, html { height: 100%; width: 100%; background: #000; overflow: hidden; font-family: sans-serif; }
         
-        body, html { 
-            height: 100%;
-            width: 100%;
-            background: #000;
-            overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        }
+        .app-container { height: 100dvh; display: flex; flex-direction: column; position: relative; }
 
-        .app-container {
-            height: 100dvh; /* Menggunakan Dynamic Viewport Height agar pas di HP */
-            display: flex;
-            flex-direction: column;
-            position: relative;
-        }
-
-        /* Area Kamera Full Screen */
         #webcam-container { 
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
+            z-index: 1; display: flex; align-items: center; justify-content: center; background: #222;
         }
         
-        #webcam-container canvas {
-            width: 100% !important;
-            height: 100% !important;
-            object-fit: cover; /* Memastikan kamera memenuhi seluruh area */
-        }
+        canvas { width: 100% !important; height: 100% !important; object-fit: cover; }
 
-        /* Overlay Tombol Kembali */
-        .btn-logout { 
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            padding: 10px 18px; 
-            background: rgba(0,0,0,0.5); 
-            color: white; 
-            border: 1px solid rgba(255,255,255,0.3); 
-            border-radius: 50px; 
-            z-index: 10;
-            backdrop-filter: blur(8px);
-            font-weight: bold;
-            text-decoration: none;
-            font-size: 14px;
-        }
-
-        /* Panel Kontrol Bawah Transparan */
         .ui-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            width: 100%;
-            padding: 30px 20px calc(20px + env(safe-area-inset-bottom));
-            background: linear-gradient(transparent, rgba(0,0,0,0.8));
-            z-index: 5;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+            position: absolute; bottom: 0; left: 0; width: 100%; 
+            padding: 20px; background: linear-gradient(transparent, rgba(0,0,0,0.9));
+            z-index: 5; display: flex; flex-direction: column; gap: 10px;
         }
 
         .label-box { 
-            padding: 18px; 
-            border-radius: 15px; 
-            font-size: 1.2em; 
-            font-weight: bold; 
-            text-align: center;
-            backdrop-filter: blur(10px);
-            transition: all 0.2s ease;
+            padding: 15px; border-radius: 12px; font-size: 1.1em; font-weight: bold; 
+            text-align: center; color: white; background: rgba(255,255,255,0.2);
+            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);
         }
-        .label-default { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); }
-        .label-mentah { background: rgba(211, 47, 47, 0.9); color: white; box-shadow: 0 0 20px rgba(211, 47, 47, 0.4); }
-        .label-matang { background: rgba(46, 125, 50, 0.9); color: white; box-shadow: 0 0 20px rgba(46, 125, 50, 0.4); }
 
         .btn-capture { 
-            width: 100%; 
-            padding: 18px; 
-            background: white; 
-            color: black; 
-            border: none; 
-            border-radius: 15px; 
-            font-size: 1.1em; 
-            font-weight: bold;
-            display: none;
+            width: 100%; padding: 18px; background: white; color: black; 
+            border: none; border-radius: 12px; font-weight: bold; font-size: 1em;
         }
 
-        /* Preview Overlay */
-        #preview-overlay {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: #000;
-            z-index: 100;
-            flex-direction: column;
+        /* Status Loading & Error */
+        #status-overlay {
+            position: fixed; inset: 0; background: white; z-index: 100;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 30px; text-align: center;
         }
-        #preview-canvas { width: 100%; height: 80%; object-fit: contain; }
-        .preview-footer { padding: 20px; display: flex; gap: 10px; background: #111; }
 
-        /* Welcome Screen */
-        #welcome-screen {
-            position: fixed;
-            inset: 0;
-            background: white;
-            z-index: 200;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 40px;
-            text-align: center;
+        .btn-start {
+            width: 100%; max-width: 300px; padding: 15px; background: #1a73e8;
+            color: white; border: none; border-radius: 10px; font-weight: bold;
         }
     </style>
 </head>
 <body>
 
-<div id="welcome-screen">
-    <h1 style="color: #1a73e8; margin-bottom: 10px;">🌴 Sortasi AI</h1>
-    <p style="color: #666; margin-bottom: 30px;">Optimasi Performa & Full Screen</p>
-    <button onclick="startApp()" style="width:100%; padding:20px; background:#1a73e8; color:white; border:none; border-radius:15px; font-weight:bold; font-size:1.1em;">MULAI SEKARANG</button>
+<div id="status-overlay">
+    <h2 id="status-title">🌴 Sortasi Sawit AI</h2>
+    <p id="status-msg" style="margin: 15px 0 25px; color: #666;">Klik tombol di bawah untuk mengaktifkan kamera.</p>
+    <button class="btn-start" id="main-btn" onclick="startProcess()">BUKA KAMERA</button>
 </div>
 
 <div class="app-container">
-    <div id="camera-page" style="display:none; height:100%;">
-        <button class="btn-logout" onclick="location.reload()">← Keluar</button>
-        
-        <div id="webcam-container"></div>
-
-        <div class="ui-overlay">
-            <div id="label-container" class="label-box label-default">Menyiapkan AI...</div>
-            <button class="btn-capture" id="capture-btn" onclick="captureImage()">📸 AMBIL GAMBAR</button>
-        </div>
-    </div>
-</div>
-
-<div id="preview-overlay">
-    <canvas id="preview-canvas"></canvas>
-    <div class="preview-footer">
-        <button onclick="closePreview()" style="flex:1; padding:15px; border-radius:10px; border:none; background:#444; color:white; font-weight:bold;">ULANGI</button>
-        <button onclick="saveImage()" style="flex:2; padding:15px; border-radius:10px; border:none; background:#17a2b8; color:white; font-weight:bold;">SIMPAN FOTO</button>
+    <div id="webcam-container"></div>
+    <div class="ui-overlay">
+        <div id="label-container" class="label-box">Menunggu Kamera...</div>
+        <button class="btn-capture" onclick="takePhoto()">📸 AMBIL GAMBAR</button>
     </div>
 </div>
 
 <script>
+    // GANTI URL INI JIKA MODEL ANDA BERBEDA
     const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZkvJoTy22/";
-    let model, webcam, labelContainer, captureBtn;
-    let isPaused = false;
+    
+    let model, webcam, labelContainer;
+    let isModelLoaded = false;
 
-    async function startApp() {
-        document.getElementById('welcome-screen').style.display = 'none';
-        document.getElementById('camera-page').style.display = 'block';
+    async function startProcess() {
+        const btn = document.getElementById('main-btn');
+        const msg = document.getElementById('status-msg');
         
-        labelContainer = document.getElementById("label-container");
-        captureBtn = document.getElementById("capture-btn");
-        
-        await initAI();
-    }
+        btn.disabled = true;
+        btn.style.opacity = "0.5";
+        msg.innerText = "1. Memuat Model AI... (Tunggu sebentar)";
 
-    async function initAI() {
         try {
+            // 1. Load Model
             model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+            isModelLoaded = true;
+            msg.innerText = "2. Meminta Izin Kamera...";
+
+            // 2. Setup Webcam
+            // Menggunakan resolusi lebih rendah untuk kompatibilitas HP lama
+            webcam = new tmImage.Webcam(innerWidth, innerHeight, false); 
             
-            // Ukuran internal proses tetap kecil agar ringan, CSS yang memperbesar tampilan
-            webcam = new tmImage.Webcam(320, 420, false); 
+            // Mencoba akses kamera belakang secara eksplisit
             await webcam.setup({ facingMode: "environment" }); 
+            
+            msg.innerText = "3. Memulai Aliran Video...";
             await webcam.play();
 
-            document.getElementById("webcam-container").appendChild(webcam.canvas);
-            captureBtn.style.display = "block";
+            // 3. Masuk ke App
+            document.getElementById('status-overlay').style.display = 'none';
+            document.getElementById('webcam-container').appendChild(webcam.canvas);
+            labelContainer = document.getElementById('label-container');
             
-            // Mulai loop prediksi
-            runPredict();
-        } catch (e) {
-            alert("Kamera Error: " + e);
+            runAI();
+        } catch (err) {
+            console.error(err);
+            btn.disabled = false;
+            btn.style.opacity = "1";
+            msg.style.color = "red";
+            
+            if (location.protocol !== 'https:') {
+                msg.innerText = "ERROR: Kamera hanya berfungsi di protokol HTTPS. Gunakan GitHub Pages atau koneksi aman.";
+            } else {
+                msg.innerText = "ERROR: Gagal akses kamera. Pastikan izin diberikan. Detail: " + err.message;
+            }
         }
     }
 
-    // Fungsi prediksi yang dioptimalkan agar tidak LAG
-    async function runPredict() {
-        if (!isPaused) {
-            webcam.update();
-            await predict();
-            // JEDA 100ms agar CPU HP tidak panas & tidak lag
-            setTimeout(() => {
-                window.requestAnimationFrame(runPredict);
-            }, 100); 
-        } else {
-            window.requestAnimationFrame(runPredict);
-        }
+    async function runAI() {
+        webcam.update();
+        await predict();
+        // Jeda 100ms agar ringan
+        setTimeout(() => {
+            requestAnimationFrame(runAI);
+        }, 100);
     }
 
     async function predict() {
         const prediction = await model.predict(webcam.canvas);
         prediction.sort((a, b) => b.probability - a.probability);
 
-        const best = prediction[0];
-        const THRESHOLD = 0.80;
-
-        if (best.probability > THRESHOLD) {
-            const label = best.className;
-            const score = (best.probability * 100).toFixed(0);
-            labelContainer.innerHTML = `${label} (${score}%)`;
-            
-            if (label.toLowerCase().includes("mentah")) {
-                labelContainer.className = "label-box label-mentah";
-            } else if (labelLower(label, ["matang", "masak"])) {
-                labelContainer.className = "label-box label-matang";
-            }
+        const res = prediction[0];
+        if (res.probability > 0.8) {
+            labelContainer.innerText = `${res.className} (${(res.probability * 100).toFixed(0)}%)`;
+            labelContainer.style.background = res.className.toLowerCase().includes("mentah") ? "#d32f2f" : "#2e7d32";
         } else {
-            labelContainer.innerHTML = "🔍 Mengamati...";
-            labelContainer.className = "label-box label-default";
+            labelContainer.innerText = "🔍 Mencari Objek...";
+            labelContainer.style.background = "rgba(0,0,0,0.5)";
         }
     }
 
-    function labelLower(text, keys) {
-        return keys.some(key => text.toLowerCase().includes(key));
-    }
-
-    function captureImage() {
-        isPaused = true;
-        const canvas = document.getElementById("preview-canvas");
-        const ctx = canvas.getContext("2d");
-        
-        canvas.width = webcam.canvas.width * 2;
-        canvas.height = webcam.canvas.height * 2;
-        
-        ctx.drawImage(webcam.canvas, 0, 0, canvas.width, canvas.height);
-        
-        // Watermark sederhana
-        ctx.fillStyle = "rgba(0,0,0,0.5)";
-        ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
-        ctx.fillStyle = "white";
-        ctx.font = "bold 24px sans-serif";
-        ctx.fillText(labelContainer.innerText, 20, canvas.height - 22);
-
-        document.getElementById("preview-overlay").style.display = "flex";
-    }
-
-    function closePreview() {
-        document.getElementById("preview-overlay").style.display = "none";
-        isPaused = false;
-    }
-
-    function saveImage() {
+    function takePhoto() {
+        const dataUrl = webcam.canvas.toDataURL("image/png");
         const link = document.createElement('a');
         link.download = `Sawit_${Date.now()}.png`;
-        link.href = document.getElementById("preview-canvas").toDataURL();
+        link.href = dataUrl;
         link.click();
     }
 </script>
