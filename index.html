@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sawit AI Compact</title>
+    <title>Sawit AI Compact + Timestamp</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
@@ -20,14 +20,12 @@
             justify-content: space-between; align-items: center;
         }
 
-        /* Top Header */
         .top-bar {
             width: 100%; padding: 15px 20px; display: flex; 
             justify-content: space-between; align-items: center; z-index: 10;
         }
         .btn-exit { background: none; border: none; color: #ccc; font-size: 14px; }
 
-        /* Camera Viewport - Menjaga Rasio Original 3:4 */
         #webcam-container { 
             width: 95%; max-width: 400px; aspect-ratio: 3 / 4;
             background: #111; border-radius: 12px; overflow: hidden;
@@ -35,7 +33,6 @@
         }
         canvas { width: 100% !important; height: 100% !important; object-fit: contain; }
 
-        /* Bottom Controls Container */
         .bottom-panel {
             width: 100%; padding: 20px; display: flex; flex-direction: column; 
             align-items: center; gap: 15px; background: #000;
@@ -58,7 +55,6 @@
             content: ''; width: 50px; height: 50px; border: 2px solid black; border-radius: 50%;
         }
 
-        /* Preview Overlay */
         #preview-overlay {
             display: none; position: fixed; inset: 0; background: #000; z-index: 100;
             flex-direction: column; align-items: center; justify-content: center; padding: 20px;
@@ -68,9 +64,8 @@
             box-shadow: 0 0 20px rgba(255,255,255,0.1);
         }
         .preview-btns { margin-top: 20px; display: flex; gap: 10px; width: 100%; max-width: 350px; }
-        .btn-p { flex: 1; padding: 14px; border-radius: 8px; border: none; font-weight: bold; }
+        .btn-p { flex: 1; padding: 14px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
 
-        /* Welcome */
         #welcome-screen {
             position: fixed; inset: 0; background: white; z-index: 200;
             display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px;
@@ -81,12 +76,13 @@
 
 <div id="welcome-screen">
     <h2 style="color: #333; margin-bottom: 20px;">🌴 Sawit Detector</h2>
-    <button onclick="startApp()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold;">MULAI</button>
+    <p style="color: #666; margin-bottom: 25px; text-align: center;">Pastikan izin kamera diberikan untuk memulai pemindaian.</p>
+    <button onclick="startApp()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold; cursor:pointer;">MULAI</button>
 </div>
 
 <div class="app-container">
     <div class="top-bar">
-        <span style="font-weight: bold; font-size: 14px; color: #666;">SCANNER v2.1</span>
+        <span style="font-weight: bold; font-size: 14px; color: #666;">SCANNER v2.5</span>
         <button class="btn-exit" onclick="location.reload()">Reset</button>
     </div>
 
@@ -116,20 +112,22 @@
         labelContainer = document.getElementById("label-container");
         try {
             model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-            // Menggunakan 320x426 (rasio 3:4) agar ringan dan tidak distorsi
             webcam = new tmImage.Webcam(320, 426, false); 
             await webcam.setup({ facingMode: "environment" }); 
             await webcam.play();
             document.getElementById("webcam-container").appendChild(webcam.canvas);
             runAI();
-        } catch (e) { alert("Error: " + e); }
+        } catch (e) { 
+            alert("Gagal mengakses kamera: " + e); 
+            document.getElementById('welcome-screen').style.display = 'flex';
+        }
     }
 
     async function runAI() {
         if (!isPaused) {
             webcam.update();
             await predict();
-            setTimeout(() => requestAnimationFrame(runAI), 100);
+            requestAnimationFrame(runAI);
         }
     }
 
@@ -154,20 +152,31 @@
         const canvas = document.getElementById("preview-canvas");
         const ctx = canvas.getContext("2d");
         
-        // Simpan dalam resolusi asli tanpa ditarik-tarik
         canvas.width = webcam.canvas.width;
         canvas.height = webcam.canvas.height;
         ctx.drawImage(webcam.canvas, 0, 0);
         
-        // Watermark Minimalis & Proporsional
-        const h = 40; // Tinggi area hitam sangat kecil
+        // --- LOGIKA TIMESTAMP ---
+        const now = new Date();
+        const tgl = now.toLocaleDateString('id-ID'); 
+        const jam = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        const timeStamp = `${tgl} | ${jam}`;
+
+        // Kotak Watermark (Semi-transparan)
+        const h = 55; 
         ctx.fillStyle = "rgba(0,0,0,0.7)";
         ctx.fillRect(0, canvas.height - h, canvas.width, h);
         
+        // Gambar Teks Hasil Prediksi AI
         ctx.fillStyle = "white";
         ctx.textAlign = "center";
-        ctx.font = "bold 14px sans-serif"; // Ukuran teks proporsional
-        ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 15);
+        ctx.font = "bold 14px sans-serif";
+        ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 32);
+
+        // Gambar Teks Tanggal & Waktu
+        ctx.font = "normal 11px sans-serif";
+        ctx.fillStyle = "#ccc"; 
+        ctx.fillText(timeStamp, canvas.width/2, canvas.height - 12);
 
         document.getElementById("preview-overlay").style.display = "flex";
     }
@@ -180,8 +189,9 @@
 
     function saveImage() {
         const link = document.createElement('a');
-        link.download = `Sawit_${Date.now()}.png`;
-        link.href = document.getElementById("preview-canvas").toDataURL();
+        const now = new Date().getTime();
+        link.download = `Sawit_AI_${now}.png`;
+        link.href = document.getElementById("preview-canvas").toDataURL("image/png");
         link.click();
     }
 </script>
