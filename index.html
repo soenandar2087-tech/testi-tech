@@ -2,200 +2,209 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sawit AI Compact Scanner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sortasi Sawit AI - Fix Area Kamera</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
-        :root { --accent: #1a73e8; --dark: #121212; }
+        /* Pengaturan Dasar */
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
-        body, html { 
-            height: 100%; width: 100%; background: var(--dark); 
-            overflow: hidden; font-family: -apple-system, sans-serif;
-        }
-
-        .app-container {
-            height: 100dvh; display: flex; flex-direction: column;
-            align-items: center; background: #000;
-        }
-
-        /* Top Header */
-        .header {
-            width: 100%; padding: 15px; text-align: center;
-            background: #1a1a1a; border-bottom: 1px solid #333;
-        }
-
-        /* Camera Box - Area ini yang kita buat pas dengan rasio 3:4 atau 1:1 */
-        #webcam-container { 
-            width: 100%; 
-            max-width: 450px; /* Lebar maksimal HP */
-            aspect-ratio: 1 / 1; /* Kita buat kotak sempurna agar fokus */
-            background: #000;
-            overflow: hidden;
-            position: relative;
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #000; /* Latar belakang hitam pekat */
+            color: #fff;
+            height: 100vh;
+            overflow: hidden; /* Mencegah scroll pada body utama */
             display: flex;
-            align-items: center;
             justify-content: center;
         }
+
+        /* Container utama: Tata letak seperti Gambar 1 */
+        .app-container {
+            width: 100%;
+            max-width: 500px; /* Batasan untuk tablet, full di HP */
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background-color: #0c0c0c; /* Latar belakang container sedikit lebih terang */
+        }
+
+        /* PERBAIKAN DI SINI: Kontainer Kamera yang Diperbaiki */
+        #webcam-container { 
+            /* Ruang kamera dipertahankan seperti Gambar 1 */
+            flex: 1; 
+            min-height: 60%; 
+            background: #000; 
+            overflow: hidden; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            position: relative;
+        }
         
-        canvas { 
-            width: 100% !important; 
-            height: 100% !important; 
-            object-fit: cover; /* Menghilangkan hitam di dalam kotak kamera */
+        /* Memastikan canvas webcam memenuhi kontainer secara portrait */
+        #webcam-container canvas {
+            height: 100% !important;
+            width: auto !important;
+            /* Jika rasio HP sangat tinggi, bagian samping mungkin terpotong, 
+               tapi objek tengah tetap fokus */
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
         }
 
-        /* Panel Kontrol langsung menempel di bawah kamera */
+        /* UI Controls di Bagian Bawah (Tetap seperti Gambar 1) */
         .controls-panel {
-            flex: 1; width: 100%; max-width: 450px;
-            background: #1a1a1a; /* Warna panel beda sedikit agar tegas */
-            display: flex; flex-direction: column;
-            align-items: center; justify-content: center;
-            gap: 20px; padding: 20px;
-            border-radius: 25px 25px 0 0; /* Memberi kesan modern */
-            margin-top: -20px; /* Membuat panel sedikit menumpuk ke kamera agar compact */
-            z-index: 5;
+            background-color: #0c0c0c;
+            padding: 30px 20px 40px; /* Jarak yang luas untuk area tombol */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            border-top: 1px solid #1a1a1a;
         }
 
-        .label-status { 
-            width: 100%; padding: 15px; border-radius: 12px;
-            font-size: 16px; font-weight: bold; text-align: center;
-            background: #282828; color: white;
-            border: 1px solid #444; transition: 0.3s;
+        .label-box { 
+            width: 100%;
+            max-width: 350px;
+            padding: 15px; 
+            border-radius: 12px; 
+            font-size: 1.2em; 
+            font-weight: bold; 
+            text-align: center;
+            min-height: 55px; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            text-transform: uppercase;
         }
-        .label-mentah { background: #8b0000 !important; border-color: #ff5252; }
-        .label-matang { background: #006400 !important; border-color: #66bb6a; }
-
-        .btn-capture-wrapper {
-            display: flex; flex-direction: column; align-items: center; gap: 10px;
-        }
+        .label-default { background-color: #2a2a2a; color: #bbb; border: 2px dashed #444; }
+        .label-mentah { background-color: #852020; color: #ffcccc; border: 2px solid #d32f2f; }
+        .label-matang { background-color: #1b5e20; color: #c8e6c9; border: 2px solid #2e7d32; }
 
         .btn-capture { 
-            width: 80px; height: 80px; background: white; 
-            border: 6px solid #333; border-radius: 50%; 
-            cursor: pointer; display: flex; align-items: center; justify-content: center;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            width: 70px; 
+            height: 70px; 
+            background-color: #fff; 
+            border: 5px solid #fff; 
+            border-radius: 50%; 
+            cursor: pointer; 
+            box-shadow: 0 0 0 4px #000, 0 0 15px rgba(255,255,255,0.5);
+            transition: 0.2s;
         }
-        .btn-inner { width: 60px; height: 60px; border: 2px solid #000; border-radius: 50%; }
+        .btn-capture:active { transform: scale(0.95); box-shadow: 0 0 0 4px #000, 0 0 5px rgba(255,255,255,0.2); }
 
-        /* Preview Overlay */
-        #preview-overlay {
-            display: none; position: fixed; inset: 0; background: #000; z-index: 100;
-            flex-direction: column; align-items: center; justify-content: center;
+        .instruction-text {
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 5px;
         }
-        #preview-canvas { width: 90%; max-height: 70%; border-radius: 12px; object-fit: contain; }
-        .preview-footer { width: 100%; padding: 30px; display: flex; gap: 15px; }
-        .btn-p { flex: 1; padding: 18px; border-radius: 12px; border: none; font-weight: bold; font-size: 16px; }
     </style>
 </head>
 <body>
 
 <div class="app-container">
-    <div class="header">
-        <h3 style="color: #eee; font-size: 14px; letter-spacing: 1px;">SCANNER SAWIT v3.0</h3>
+    <div id="webcam-container">
+        <span style="color: #666;">Mengaktifkan Kamera Portrait...</span>
     </div>
-
-    <div id="webcam-container"></div>
 
     <div class="controls-panel">
-        <div id="label-container" class="label-status">MENGHUBUNGKAN...</div>
-        
-        <div class="btn-capture-wrapper">
-            <button class="btn-capture" onclick="captureImage()">
-                <div class="btn-inner"></div>
-            </button>
-            <p style="color: #888; font-size: 12px;">Ketuk untuk ambil gambar</p>
-        </div>
-        
-        <button onclick="location.reload()" style="background:none; border:none; color:#555; font-size: 12px; text-decoration: underline;">Reset Kamera</button>
-    </div>
-</div>
-
-<div id="preview-overlay">
-    <canvas id="preview-canvas"></canvas>
-    <div class="preview-footer">
-        <button class="btn-p" onclick="closePreview()" style="background:#333; color:white;">ULANGI</button>
-        <button class="btn-p" onclick="saveImage()" style="background:var(--accent); color:white;">SIMPAN</button>
+        <div id="label-container" class="label-box label-default">Memuat AI...</div>
+        <button class="btn-capture" id="capture-btn" onclick="captureImage()"></button>
+        <p class="instruction-text">Posisikan buah di tengah kotak</p>
     </div>
 </div>
 
 <script>
+    // URL Model Teachable Machine Anda
     const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZkvJoTy22/";
-    let model, webcam, labelContainer, isPaused = false;
+    let model, webcam, maxPredictions, labelContainer;
 
+    // Fungsi Inisialisasi
     async function init() {
         labelContainer = document.getElementById("label-container");
+        labelContainer.innerHTML = "Memuat AI...";
+        
         try {
+            // 1. Memuat Model AI
             model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+            maxPredictions = model.getTotalClasses();
+
+            // 2. Setup Webcam dengan orientasi Portrait
+            // Kita minta 480x640. Teachable machine akan mencoba menyesuaikan.
+            webcam = new tmImage.Webcam(480, 640, false); 
             
-            // Kita gunakan rasio kotak (400x400)
-            webcam = new tmImage.Webcam(400, 400, false); 
+            // Mencoba memaksa kamera belakang
             await webcam.setup({ facingMode: "environment" }); 
             await webcam.play();
-            
-            document.getElementById("webcam-container").appendChild(webcam.canvas);
-            runAI();
-        } catch (e) { alert("Akses kamera ditolak/error"); }
-    }
 
-    async function runAI() {
-        if (!isPaused) {
-            webcam.update();
-            await predict();
-            setTimeout(() => requestAnimationFrame(runAI), 100);
+            // 3. Masukkan canvas ke kontainer
+            document.getElementById("webcam-container").innerHTML = "";
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            
+            // Mulai loop prediksi
+            window.requestAnimationFrame(loop);
+        } catch (e) {
+            console.error(e);
+            labelContainer.innerHTML = "Kamera Error";
+            alert("Gagal mengakses kamera. Pastikan izin diberikan.");
         }
     }
 
+    // Loop Prediksi Real-time
+    async function loop() {
+        webcam.update();
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    // Fungsi Prediksi
     async function predict() {
         const prediction = await model.predict(webcam.canvas);
+        
+        // Urutkan berdasarkan probabilitas tertinggi
         prediction.sort((a, b) => b.probability - a.probability);
-        const res = prediction[0];
+        
+        const bestPrediction = prediction[0];
+        const THRESHOLD = 0.85; // Ambang batas kepercayaan
 
-        if (res.probability > 0.8) {
-            labelContainer.innerHTML = `${res.className.toUpperCase()} (${(res.probability * 100).toFixed(0)}%)`;
-            if (res.className.toLowerCase().includes("mentah")) {
-                labelContainer.className = "label-status label-mentah";
-            } else {
-                labelContainer.className = "label-status label-matang";
-            }
+        // Perbarui Label UI
+        if (bestPrediction.probability < THRESHOLD) {
+            labelContainer.innerHTML = "Cari Objek Sawit...";
+            labelContainer.className = "label-box label-default";
         } else {
-            labelContainer.innerHTML = "MENCARI OBJEK...";
-            labelContainer.className = "label-status";
+            const labelLower = bestPrediction.className.toLowerCase();
+            const confidencePercent = (bestPrediction.probability * 100).toFixed(0);
+            labelContainer.innerHTML = `${bestPrediction.className} (${confidencePercent}%)`;
+            
+            // Logika Warna berdasarkan nama class
+            if (labelLower.includes("mentah")) {
+                labelContainer.className = "label-box label-mentah";
+            } else if (labelLower.includes("matang")) {
+                labelContainer.className = "label-box label-matang";
+            } else {
+                labelContainer.className = "label-box label-default";
+            }
         }
     }
 
+    // Fungsi Ambil Gambar (Watermark Sederhana)
     function captureImage() {
-        isPaused = true;
-        const canvas = document.getElementById("preview-canvas");
-        const ctx = canvas.getContext("2d");
-        canvas.width = webcam.canvas.width;
-        canvas.height = webcam.canvas.height;
-        ctx.drawImage(webcam.canvas, 0, 0);
+        const bestPrediction = labelContainer.innerText;
+        const dataUrl = webcam.canvas.toDataURL("image/png");
         
-        ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.fillRect(0, canvas.height - 50, canvas.width, 50);
-        ctx.fillStyle = "white";
-        ctx.textAlign = "center";
-        ctx.font = "bold 16px Arial";
-        ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 20);
-
-        document.getElementById("preview-overlay").style.display = "flex";
-    }
-
-    function closePreview() {
-        document.getElementById("preview-overlay").style.display = "none";
-        isPaused = false;
-        runAI();
-    }
-
-    function saveImage() {
+        // Di sini Anda bisa menambahkan logika untuk menyimpan atau mengunggah dataUrl ini.
+        // Untuk contoh ini, kita hanya akan memicu unduhan.
         const link = document.createElement('a');
-        link.download = `Sawit_${Date.now()}.png`;
-        link.href = document.getElementById("preview-canvas").toDataURL();
+        link.download = `Sawit_${bestPrediction.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${new Date().getTime()}.png`;
+        link.href = dataUrl;
         link.click();
     }
 
-    window.onload = init;
+    // Jalankan init setelah halaman dimuat
+    window.addEventListener("load", init);
 </script>
 </body>
 </html>
