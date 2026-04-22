@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>AI Detektor Sawit Pro - Portrait</title>
+    <title>AI Detektor Sawit Pro - Portrait - Fix Area Hitam</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
@@ -72,8 +72,12 @@
             display: none; position: fixed; inset: 0;
             background: #000; z-index: 100; flex-direction: column;
         }
-        #preview-canvas { width: 100%; height: 75%; object-fit: contain; background: #111; }
-        .preview-footer { padding: 25px; display: flex; gap: 10px; background: #1a1a1a; }
+        
+        /* Area Canvas diperluas */
+        #preview-canvas { width: 100%; height: calc(100% - 100px); object-fit: contain; background: #111; }
+        
+        /* Footer dipersempit */
+        .preview-footer { padding: 15px 25px 25px; display: flex; gap: 10px; background: #1a1a1a; height: 100px; }
         .btn-action { flex: 1; padding: 18px; border-radius: 12px; border: none; font-weight: bold; cursor: pointer; }
 
         /* Layar Awal */
@@ -89,7 +93,7 @@
 <div id="welcome-screen">
     <div style="font-size: 5em; margin-bottom: 20px;">🌴</div>
     <h1 style="color: #1a73e8;">Sortasi Sawit AI</h1>
-    <p style="color: #666; margin: 15px 0 35px;">Versi Mobile Portrait & Performa Ringan</p>
+    <p style="color: #666; margin: 15px 0 35px;">Versi Mobile Portrait & Performa Ringan - Fix Area Hitam</p>
     <button onclick="startApp()" style="width:100%; max-width:300px; padding:20px; background:#1a73e8; color:white; border:none; border-radius:15px; font-weight:bold; font-size:1.1em;">BUKA KAMERA</button>
 </div>
 
@@ -188,20 +192,29 @@
         // Gambar dari webcam ke canvas preview
         ctx.drawImage(webcam.canvas, 0, 0, canvas.width, canvas.height);
         
-        // Watermark Hitam Transparan
+        // Watermark Hitam Transparan - Jauh lebih sempit
+        const watermarkHeight = 150; // Tinggi area watermark
         ctx.fillStyle = "rgba(0,0,0,0.6)";
-        ctx.fillRect(0, canvas.height - 120, canvas.width, 120);
+        ctx.fillRect(0, canvas.height - watermarkHeight, canvas.width, watermarkHeight);
         
-        // Teks Hasil
+        // Atur perataan teks ke tengah (SIMETRIS)
+        ctx.textAlign = "center";
+        
+        // Teks Hasil - Font lebih besar
         ctx.fillStyle = "white";
-        ctx.font = "bold 40px Arial";
-        ctx.fillText(`HASIL: ${labelContainer.innerText}`, 30, canvas.height - 70);
+        ctx.font = "bold 56px Arial"; // Ukuran font diperbesar
+        // Posisikan teks hasil di tengah secara horizontal dan vertikal
+        ctx.fillText(`HASIL: ${labelContainer.innerText}`, canvas.width / 2, canvas.height - watermarkHeight / 2 - 10);
         
-        // Teks Tanggal
+        // Teks Tanggal - Font lebih besar
         const tgl = new Date().toLocaleString('id-ID');
-        ctx.font = "24px Arial";
+        ctx.font = "32px Arial"; // Ukuran font diperbesar
         ctx.fillStyle = "#ccc";
-        ctx.fillText(`Waktu: ${tgl} | AI Detector`, 30, canvas.height - 30);
+        // Posisikan teks tanggal di bawah teks hasil, masih di tengah secara horizontal
+        ctx.fillText(`Waktu: ${tgl} | AI Detector`, canvas.width / 2, canvas.height - watermarkHeight / 2 + 50);
+
+        // Atur kembali perataan teks ke kiri untuk penggunaan di luar watermark jika diperlukan
+        ctx.textAlign = "left";
 
         document.getElementById("preview-overlay").style.display = "flex";
     }
