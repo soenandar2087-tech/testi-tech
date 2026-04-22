@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sawit AI Scanner v2.5</title>
+    <title>Sawit AI v2.6</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
@@ -15,62 +15,51 @@
             overflow: hidden; font-family: sans-serif; color: white;
         }
 
+        /* Container menggunakan posisi fixed agar kamera bisa ditarik maksimal */
         .app-container {
-            height: 100dvh; display: flex; flex-direction: column;
-            align-items: center; padding-bottom: 10px;
+            position: fixed; inset: 0;
+            display: flex; flex-direction: column;
         }
 
-        /* Top Header */
         .top-bar {
             width: 100%; padding: 15px 20px; display: flex; 
             justify-content: space-between; align-items: center; z-index: 10;
         }
-        .btn-exit { background: none; border: none; color: #ccc; font-size: 14px; cursor: pointer; }
 
-        /* Camera Viewport - Dinamis mengisi ruang */
+        /* Area Kamera yang Diperbaiki */
         #webcam-container { 
-            width: 95%; 
-            max-width: 400px; 
-            flex: 1; /* Ini yang akan mengisi area kuning */
+            flex: 1; /* Mengambil semua ruang sisa termasuk area kuning tadi */
+            width: 100%; 
             background: #111; 
-            border-radius: 12px; 
             overflow: hidden;
-            position: relative; 
-            border: 1px solid #333;
-            margin: 5px 0;
+            position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
         }
         
-        /* Memastikan gambar kamera memenuhi kotak tanpa area hitam */
         canvas { 
             width: 100% !important; 
             height: 100% !important; 
-            object-fit: cover !important; 
+            object-fit: cover !important; /* Menutup seluruh area hitam */
         }
 
-        /* Bottom Controls */
         .bottom-panel {
-            width: 100%; padding: 15px 20px; display: flex; flex-direction: column; 
-            align-items: center; gap: 12px; background: #000;
+            width: 100%; padding: 20px; display: flex; flex-direction: column; 
+            align-items: center; gap: 15px; background: #000; z-index: 10;
         }
 
         .label-status { 
-            width: 100%; max-width: 320px; padding: 12px; border-radius: 8px;
+            width: 90%; max-width: 320px; padding: 12px; border-radius: 8px;
             font-size: 14px; font-weight: bold; text-align: center;
-            background: #222; border: 1px solid #333; transition: 0.3s;
+            background: #222; border: 1px solid #333;
         }
         .label-mentah { background: #641515; border-color: #f44336; color: #ffcdd2; }
         .label-matang { background: #1b3d1d; border-color: #4caf50; color: #c8e6c9; }
 
         .btn-capture { 
             width: 70px; height: 70px; background: white; border: 5px solid #333;
-            border-radius: 50%; cursor: pointer; display: flex; align-items: center; 
-            justify-content: center;
-        }
-        .btn-capture::after {
-            content: ''; width: 50px; height: 50px; border: 2px solid black; border-radius: 50%;
+            border-radius: 50%; cursor: pointer;
         }
 
         /* Preview Overlay */
@@ -78,37 +67,33 @@
             display: none; position: fixed; inset: 0; background: #000; z-index: 100;
             flex-direction: column; align-items: center; justify-content: center; padding: 20px;
         }
-        #preview-canvas { 
-            width: 100%; max-width: 350px; border-radius: 8px; 
-            box-shadow: 0 0 20px rgba(255,255,255,0.1);
-        }
+        #preview-canvas { width: 100%; max-width: 350px; border-radius: 8px; }
         .preview-btns { margin-top: 20px; display: flex; gap: 10px; width: 100%; max-width: 350px; }
-        .btn-p { flex: 1; padding: 14px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
+        .btn-p { flex: 1; padding: 14px; border-radius: 8px; border: none; font-weight: bold; }
 
         #welcome-screen {
             position: fixed; inset: 0; background: white; z-index: 200;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
     </style>
 </head>
 <body>
 
 <div id="welcome-screen">
-    <h2 style="color: #333; margin-bottom: 10px;">🌴 Sawit Detector</h2>
-    <p style="color: #666; margin-bottom: 25px;">Versi 2.5 dengan Timestamp</p>
-    <button onclick="startApp()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold; cursor:pointer;">MULAI KAMERA</button>
+    <h2 style="color:#333; margin-bottom:20px;">🌴 Sawit AI</h2>
+    <button onclick="startApp()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold;">MULAI</button>
 </div>
 
 <div class="app-container">
     <div class="top-bar">
-        <span style="font-weight: bold; font-size: 13px; color: #666;">SCANNER v2.5</span>
-        <button class="btn-exit" onclick="location.reload()">Reset</button>
+        <span style="font-weight: bold; font-size: 13px; color: #666;">SCANNER v2.6</span>
+        <button onclick="location.reload()" style="background:none; border:none; color:#666;">Reset</button>
     </div>
 
     <div id="webcam-container"></div>
 
     <div class="bottom-panel">
-        <div id="label-container" class="label-status">Menunggu Kamera...</div>
+        <div id="label-container" class="label-status">Mencari...</div>
         <button class="btn-capture" onclick="captureImage()"></button>
         <p style="font-size: 10px; color: #555;">Posisikan buah di tengah kotak</p>
     </div>
@@ -131,15 +116,13 @@
         labelContainer = document.getElementById("label-container");
         try {
             model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-            // Setup webcam dengan resolusi fleksibel
-            webcam = new tmImage.Webcam(400, 400, false); 
+            // Menggunakan resolusi 640x480 agar lebih tajam di layar panjang
+            webcam = new tmImage.Webcam(480, 640, false); 
             await webcam.setup({ facingMode: "environment" }); 
             await webcam.play();
             document.getElementById("webcam-container").appendChild(webcam.canvas);
             runAI();
-        } catch (e) { 
-            alert("Error: " + e); 
-        }
+        } catch (e) { alert("Error Kamera: " + e); }
     }
 
     async function runAI() {
@@ -171,30 +154,25 @@
         const canvas = document.getElementById("preview-canvas");
         const ctx = canvas.getContext("2d");
         
-        // Gunakan ukuran canvas webcam saat ini
         canvas.width = webcam.canvas.width;
         canvas.height = webcam.canvas.height;
         ctx.drawImage(webcam.canvas, 0, 0);
         
-        // Ambil Data Waktu
         const now = new Date();
         const tgl = now.toLocaleDateString('id-ID'); 
         const jam = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const timeStamp = `${tgl} | ${jam}`;
 
-        // Watermark Box
         const h = 55; 
         ctx.fillStyle = "rgba(0,0,0,0.7)";
         ctx.fillRect(0, canvas.height - h, canvas.width, h);
         
-        // Text Hasil Prediksi
         ctx.fillStyle = "white";
         ctx.textAlign = "center";
-        ctx.font = "bold 14px sans-serif";
+        ctx.font = "bold 16px sans-serif";
         ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 32);
 
-        // Text Tanggal & Waktu
-        ctx.font = "normal 11px sans-serif";
+        ctx.font = "normal 12px sans-serif";
         ctx.fillStyle = "#ccc"; 
         ctx.fillText(timeStamp, canvas.width/2, canvas.height - 12);
 
