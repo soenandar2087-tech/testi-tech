@@ -3,214 +3,171 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sawit AI Scanner v2.5</title>
+    <title>Sawit AI v3.0</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
-        :root { --accent: #1a73e8; --bg: #000; }
+        :root { --accent: #1a73e8; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body, html { 
-            height: 100%; width: 100%; background: var(--bg); 
-            overflow: hidden; font-family: sans-serif; color: white;
+            height: 100%; width: 100%; background: #000; 
+            overflow: hidden; font-family: sans-serif;
         }
 
         .app-container {
             height: 100dvh; display: flex; flex-direction: column;
-            align-items: center; padding-bottom: 10px;
         }
 
-        /* Top Header */
-        .top-bar {
-            width: 100%; padding: 15px 20px; display: flex; 
-            justify-content: space-between; align-items: center; z-index: 10;
-        }
-        .btn-exit { background: none; border: none; color: #ccc; font-size: 14px; cursor: pointer; }
-
-        /* Camera Viewport - Dinamis mengisi ruang */
-        #webcam-container { 
-            width: 95%; 
-            max-width: 400px; 
-            flex: 1; /* Ini yang akan mengisi area kuning */
-            background: #111; 
-            border-radius: 12px; 
+        /* Area Kamera - Sekarang Benar-benar Penuh ke bawah */
+        #video-wrapper { 
+            flex: 1; 
+            position: relative;
+            background: #000;
             overflow: hidden;
-            position: relative; 
-            border: 1px solid #333;
-            margin: 5px 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
         
-        /* Memastikan gambar kamera memenuhi kotak tanpa area hitam */
-        canvas { 
-            width: 100% !important; 
-            height: 100% !important; 
-            object-fit: cover !important; 
+        #main-video { 
+            position: absolute;
+            width: 100%; height: 100%;
+            object-fit: cover; /* Menghilangkan area hitam */
         }
 
-        /* Bottom Controls */
         .bottom-panel {
-            width: 100%; padding: 15px 20px; display: flex; flex-direction: column; 
-            align-items: center; gap: 12px; background: #000;
+            padding: 20px 10px 30px 10px;
+            display: flex; flex-direction: column; align-items: center; 
+            gap: 15px; background: #000; z-index: 5;
         }
 
         .label-status { 
-            width: 100%; max-width: 320px; padding: 12px; border-radius: 8px;
+            width: 90%; max-width: 320px; padding: 12px; border-radius: 8px;
             font-size: 14px; font-weight: bold; text-align: center;
-            background: #222; border: 1px solid #333; transition: 0.3s;
+            background: #222; border: 1px solid #333; color: white;
         }
-        .label-mentah { background: #641515; border-color: #f44336; color: #ffcdd2; }
-        .label-matang { background: #1b3d1d; border-color: #4caf50; color: #c8e6c9; }
+        .label-mentah { background: #641515; border-color: #f44336; }
+        .label-matang { background: #1b3d1d; border-color: #4caf50; }
 
         .btn-capture { 
             width: 70px; height: 70px; background: white; border: 5px solid #333;
-            border-radius: 50%; cursor: pointer; display: flex; align-items: center; 
-            justify-content: center;
-        }
-        .btn-capture::after {
-            content: ''; width: 50px; height: 50px; border: 2px solid black; border-radius: 50%;
+            border-radius: 50%; outline: none;
         }
 
-        /* Preview Overlay */
         #preview-overlay {
             display: none; position: fixed; inset: 0; background: #000; z-index: 100;
             flex-direction: column; align-items: center; justify-content: center; padding: 20px;
         }
-        #preview-canvas { 
-            width: 100%; max-width: 350px; border-radius: 8px; 
-            box-shadow: 0 0 20px rgba(255,255,255,0.1);
-        }
-        .preview-btns { margin-top: 20px; display: flex; gap: 10px; width: 100%; max-width: 350px; }
-        .btn-p { flex: 1; padding: 14px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; }
+        #preview-canvas { width: 100%; max-width: 350px; border-radius: 8px; }
+        .preview-btns { margin-top: 20px; display: flex; gap: 10px; width: 100%; }
+        .btn-p { flex: 1; padding: 15px; border-radius: 8px; border: none; font-weight: bold; color: white; }
 
-        #welcome-screen {
+        #welcome {
             position: fixed; inset: 0; background: white; z-index: 200;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
         }
     </style>
 </head>
 <body>
 
-<div id="welcome-screen">
-    <h2 style="color: #333; margin-bottom: 10px;">🌴 Sawit Detector</h2>
-    <p style="color: #666; margin-bottom: 25px;">Versi 2.5 dengan Timestamp</p>
-    <button onclick="startApp()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold; cursor:pointer;">MULAI KAMERA</button>
+<div id="welcome">
+    <button onclick="init()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold;">MULAI SCANNER</button>
 </div>
 
 <div class="app-container">
-    <div class="top-bar">
-        <span style="font-weight: bold; font-size: 13px; color: #666;">SCANNER v2.5</span>
-        <button class="btn-exit" onclick="location.reload()">Reset</button>
+    <div id="video-wrapper">
+        <video id="main-video" autoplay playsinline muted></video>
     </div>
 
-    <div id="webcam-container"></div>
-
     <div class="bottom-panel">
-        <div id="label-container" class="label-status">Menunggu Kamera...</div>
-        <button class="btn-capture" onclick="captureImage()"></button>
-        <p style="font-size: 10px; color: #555;">Posisikan buah di tengah kotak</p>
+        <div id="label-container" class="label-status">Menghubungkan...</div>
+        <button class="btn-capture" onclick="takePhoto()"></button>
     </div>
 </div>
 
 <div id="preview-overlay">
     <canvas id="preview-canvas"></canvas>
     <div class="preview-btns">
-        <button class="btn-p" onclick="closePreview()" style="background:#333; color:white;">ULANGI</button>
-        <button class="btn-p" onclick="saveImage()" style="background:var(--accent); color:white;">SIMPAN</button>
+        <button class="btn-p" onclick="reset()" style="background:#333;">ULANGI</button>
+        <button class="btn-p" onclick="save()" style="background:var(--accent);">SIMPAN</button>
     </div>
 </div>
 
 <script>
     const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZkvJoTy22/";
-    let model, webcam, labelContainer, isPaused = false;
+    let model, video, labelContainer, isActive = true;
 
-    async function startApp() {
-        document.getElementById('welcome-screen').style.display = 'none';
-        labelContainer = document.getElementById("label-container");
+    async function init() {
+        document.getElementById('welcome').style.display = 'none';
+        video = document.getElementById('main-video');
+        labelContainer = document.getElementById('label-container');
+
         try {
             model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-            // Setup webcam dengan resolusi fleksibel
-            webcam = new tmImage.Webcam(400, 400, false); 
-            await webcam.setup({ facingMode: "environment" }); 
-            await webcam.play();
-            document.getElementById("webcam-container").appendChild(webcam.canvas);
-            runAI();
-        } catch (e) { 
-            alert("Error: " + e); 
+            
+            // Mengambil akses kamera HP secara manual (Lebih stabil)
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: "environment" }, 
+                audio: false 
+            });
+            video.srcObject = stream;
+            
+            predictLoop();
+        } catch (e) { alert("Error: " + e); }
+    }
+
+    async function predictLoop() {
+        if (isActive) {
+            const prediction = await model.predict(video);
+            prediction.sort((a, b) => b.probability - a.probability);
+            const res = prediction[0];
+
+            if (res.probability > 0.75) {
+                labelContainer.innerHTML = `${res.className.toUpperCase()} (${(res.probability * 100).toFixed(0)}%)`;
+                if (res.className.toLowerCase().includes("mentah")) labelContainer.className = "label-status label-mentah";
+                else labelContainer.className = "label-status label-matang";
+            } else {
+                labelContainer.innerHTML = "🔍 MENCARI OBJEK...";
+                labelContainer.className = "label-status";
+            }
+            requestAnimationFrame(predictLoop);
         }
     }
 
-    async function runAI() {
-        if (!isPaused) {
-            webcam.update();
-            await predict();
-            requestAnimationFrame(runAI);
-        }
-    }
-
-    async function predict() {
-        const prediction = await model.predict(webcam.canvas);
-        prediction.sort((a, b) => b.probability - a.probability);
-        const res = prediction[0];
-
-        if (res.probability > 0.8) {
-            labelContainer.innerHTML = `${res.className.toUpperCase()} (${(res.probability * 100).toFixed(0)}%)`;
-            const label = res.className.toLowerCase();
-            if (label.includes("mentah")) labelContainer.className = "label-status label-mentah";
-            else if (label.includes("matang") || label.includes("masak")) labelContainer.className = "label-status label-matang";
-        } else {
-            labelContainer.innerHTML = "🔍 MENCARI OBJEK...";
-            labelContainer.className = "label-status";
-        }
-    }
-
-    function captureImage() {
-        isPaused = true;
+    function takePhoto() {
+        isActive = false;
         const canvas = document.getElementById("preview-canvas");
         const ctx = canvas.getContext("2d");
-        
-        // Gunakan ukuran canvas webcam saat ini
-        canvas.width = webcam.canvas.width;
-        canvas.height = webcam.canvas.height;
-        ctx.drawImage(webcam.canvas, 0, 0);
-        
-        // Ambil Data Waktu
-        const now = new Date();
-        const tgl = now.toLocaleDateString('id-ID'); 
-        const jam = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-        const timeStamp = `${tgl} | ${jam}`;
 
-        // Watermark Box
-        const h = 55; 
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.fillRect(0, canvas.height - h, canvas.width, h);
+        // Set ukuran canvas sesuai tampilan video di layar
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0);
+
+        // Watermark Tanggal & Waktu
+        const now = new Date();
+        const info = `${now.toLocaleDateString('id-ID')} | ${now.toLocaleTimeString('id-ID')}`;
         
-        // Text Hasil Prediksi
+        ctx.fillStyle = "rgba(0,0,0,0.6)";
+        ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
         ctx.fillStyle = "white";
         ctx.textAlign = "center";
-        ctx.font = "bold 14px sans-serif";
-        ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 32);
-
-        // Text Tanggal & Waktu
-        ctx.font = "normal 11px sans-serif";
-        ctx.fillStyle = "#ccc"; 
-        ctx.fillText(timeStamp, canvas.width/2, canvas.height - 12);
+        ctx.font = "bold 20px sans-serif";
+        ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 35);
+        ctx.font = "14px sans-serif";
+        ctx.fillText(info, canvas.width/2, canvas.height - 15);
 
         document.getElementById("preview-overlay").style.display = "flex";
     }
 
-    function closePreview() {
+    function reset() {
         document.getElementById("preview-overlay").style.display = "none";
-        isPaused = false;
-        runAI();
+        isActive = true;
+        predictLoop();
     }
 
-    function saveImage() {
+    function save() {
         const link = document.createElement('a');
         link.download = `Sawit_${Date.now()}.png`;
-        link.href = document.getElementById("preview-canvas").toDataURL("image/png");
+        link.href = document.getElementById("preview-canvas").toDataURL();
         link.click();
     }
 </script>
