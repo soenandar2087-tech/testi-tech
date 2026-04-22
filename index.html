@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sawit AI Compact + Timestamp</title>
+    <title>Sawit AI Scanner v2.5</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
@@ -17,25 +17,43 @@
 
         .app-container {
             height: 100dvh; display: flex; flex-direction: column;
-            justify-content: space-between; align-items: center;
+            align-items: center; padding-bottom: 10px;
         }
 
+        /* Top Header */
         .top-bar {
             width: 100%; padding: 15px 20px; display: flex; 
             justify-content: space-between; align-items: center; z-index: 10;
         }
-        .btn-exit { background: none; border: none; color: #ccc; font-size: 14px; }
+        .btn-exit { background: none; border: none; color: #ccc; font-size: 14px; cursor: pointer; }
 
+        /* Camera Viewport - Dinamis mengisi ruang */
         #webcam-container { 
-            width: 95%; max-width: 400px; aspect-ratio: 3 / 4;
-            background: #111; border-radius: 12px; overflow: hidden;
-            position: relative; border: 1px solid #333;
+            width: 95%; 
+            max-width: 400px; 
+            flex: 1; /* Ini yang akan mengisi area kuning */
+            background: #111; 
+            border-radius: 12px; 
+            overflow: hidden;
+            position: relative; 
+            border: 1px solid #333;
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        canvas { width: 100% !important; height: 100% !important; object-fit: contain; }
+        
+        /* Memastikan gambar kamera memenuhi kotak tanpa area hitam */
+        canvas { 
+            width: 100% !important; 
+            height: 100% !important; 
+            object-fit: cover !important; 
+        }
 
+        /* Bottom Controls */
         .bottom-panel {
-            width: 100%; padding: 20px; display: flex; flex-direction: column; 
-            align-items: center; gap: 15px; background: #000;
+            width: 100%; padding: 15px 20px; display: flex; flex-direction: column; 
+            align-items: center; gap: 12px; background: #000;
         }
 
         .label-status { 
@@ -49,12 +67,13 @@
         .btn-capture { 
             width: 70px; height: 70px; background: white; border: 5px solid #333;
             border-radius: 50%; cursor: pointer; display: flex; align-items: center; 
-            justify-content: center; position: relative;
+            justify-content: center;
         }
         .btn-capture::after {
             content: ''; width: 50px; height: 50px; border: 2px solid black; border-radius: 50%;
         }
 
+        /* Preview Overlay */
         #preview-overlay {
             display: none; position: fixed; inset: 0; background: #000; z-index: 100;
             flex-direction: column; align-items: center; justify-content: center; padding: 20px;
@@ -75,14 +94,14 @@
 <body>
 
 <div id="welcome-screen">
-    <h2 style="color: #333; margin-bottom: 20px;">🌴 Sawit Detector</h2>
-    <p style="color: #666; margin-bottom: 25px; text-align: center;">Pastikan izin kamera diberikan untuk memulai pemindaian.</p>
-    <button onclick="startApp()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold; cursor:pointer;">MULAI</button>
+    <h2 style="color: #333; margin-bottom: 10px;">🌴 Sawit Detector</h2>
+    <p style="color: #666; margin-bottom: 25px;">Versi 2.5 dengan Timestamp</p>
+    <button onclick="startApp()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold; cursor:pointer;">MULAI KAMERA</button>
 </div>
 
 <div class="app-container">
     <div class="top-bar">
-        <span style="font-weight: bold; font-size: 14px; color: #666;">SCANNER v2.5</span>
+        <span style="font-weight: bold; font-size: 13px; color: #666;">SCANNER v2.5</span>
         <button class="btn-exit" onclick="location.reload()">Reset</button>
     </div>
 
@@ -112,14 +131,14 @@
         labelContainer = document.getElementById("label-container");
         try {
             model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-            webcam = new tmImage.Webcam(320, 426, false); 
+            // Setup webcam dengan resolusi fleksibel
+            webcam = new tmImage.Webcam(400, 400, false); 
             await webcam.setup({ facingMode: "environment" }); 
             await webcam.play();
             document.getElementById("webcam-container").appendChild(webcam.canvas);
             runAI();
         } catch (e) { 
-            alert("Gagal mengakses kamera: " + e); 
-            document.getElementById('welcome-screen').style.display = 'flex';
+            alert("Error: " + e); 
         }
     }
 
@@ -152,28 +171,29 @@
         const canvas = document.getElementById("preview-canvas");
         const ctx = canvas.getContext("2d");
         
+        // Gunakan ukuran canvas webcam saat ini
         canvas.width = webcam.canvas.width;
         canvas.height = webcam.canvas.height;
         ctx.drawImage(webcam.canvas, 0, 0);
         
-        // --- LOGIKA TIMESTAMP ---
+        // Ambil Data Waktu
         const now = new Date();
         const tgl = now.toLocaleDateString('id-ID'); 
         const jam = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         const timeStamp = `${tgl} | ${jam}`;
 
-        // Kotak Watermark (Semi-transparan)
+        // Watermark Box
         const h = 55; 
         ctx.fillStyle = "rgba(0,0,0,0.7)";
         ctx.fillRect(0, canvas.height - h, canvas.width, h);
         
-        // Gambar Teks Hasil Prediksi AI
+        // Text Hasil Prediksi
         ctx.fillStyle = "white";
         ctx.textAlign = "center";
         ctx.font = "bold 14px sans-serif";
         ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 32);
 
-        // Gambar Teks Tanggal & Waktu
+        // Text Tanggal & Waktu
         ctx.font = "normal 11px sans-serif";
         ctx.fillStyle = "#ccc"; 
         ctx.fillText(timeStamp, canvas.width/2, canvas.height - 12);
@@ -189,8 +209,7 @@
 
     function saveImage() {
         const link = document.createElement('a');
-        const now = new Date().getTime();
-        link.download = `Sawit_AI_${now}.png`;
+        link.download = `Sawit_${Date.now()}.png`;
         link.href = document.getElementById("preview-canvas").toDataURL("image/png");
         link.click();
     }
