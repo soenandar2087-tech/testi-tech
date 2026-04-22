@@ -3,106 +3,111 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sawit AI Compact</title>
+    <title>Sawit AI Full Screen Compact</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
-        :root { --accent: #1a73e8; --bg: #000; }
+        :root { --accent: #1a73e8; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
         
         body, html { 
-            height: 100%; width: 100%; background: var(--bg); 
-            overflow: hidden; font-family: sans-serif; color: white;
+            height: 100%; width: 100%; background: #000; 
+            overflow: hidden; font-family: sans-serif;
         }
 
         .app-container {
-            height: 100dvh; display: flex; flex-direction: column;
-            justify-content: space-between; align-items: center;
+            height: 100dvh; width: 100%;
+            position: relative; display: flex; flex-direction: column;
         }
 
-        /* Top Header */
-        .top-bar {
-            width: 100%; padding: 15px 20px; display: flex; 
-            justify-content: space-between; align-items: center; z-index: 10;
-        }
-        .btn-exit { background: none; border: none; color: #ccc; font-size: 14px; }
-
-        /* Camera Viewport - Menjaga Rasio Original 3:4 */
+        /* Area Kamera Full Screen */
         #webcam-container { 
-            width: 95%; max-width: 400px; aspect-ratio: 3 / 4;
-            background: #111; border-radius: 12px; overflow: hidden;
-            position: relative; border: 1px solid #333;
+            position: absolute; top: 0; left: 0;
+            width: 100%; height: 100%; z-index: 1;
         }
-        canvas { width: 100% !important; height: 100% !important; object-fit: contain; }
+        
+        /* Penting: object-fit: cover agar full tapi tidak melebar */
+        canvas { 
+            width: 100% !important; 
+            height: 100% !important; 
+            object-fit: cover; 
+        }
 
-        /* Bottom Controls Container */
+        /* Overlay UI (Teks & Tombol) */
+        .ui-content {
+            position: relative; z-index: 10;
+            height: 100%; display: flex; flex-direction: column;
+            justify-content: space-between;
+            pointer-events: none; /* Klik bisa tembus ke kamera jika perlu */
+        }
+
+        .top-bar {
+            padding: 20px; display: flex; justify-content: space-between;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.5), transparent);
+            pointer-events: auto;
+        }
+
         .bottom-panel {
-            width: 100%; padding: 20px; display: flex; flex-direction: column; 
-            align-items: center; gap: 15px; background: #000;
+            padding: 30px 20px calc(20px + env(safe-area-inset-bottom));
+            background: linear-gradient(to top, rgba(0,0,0,0.7), transparent);
+            display: flex; flex-direction: column; align-items: center; gap: 20px;
+            pointer-events: auto;
         }
 
         .label-status { 
-            width: 100%; max-width: 320px; padding: 12px; border-radius: 8px;
-            font-size: 14px; font-weight: bold; text-align: center;
-            background: #222; border: 1px solid #333; transition: 0.3s;
+            width: 90%; max-width: 350px; padding: 15px; border-radius: 12px;
+            font-size: 16px; font-weight: bold; text-align: center;
+            background: rgba(40, 40, 40, 0.8); color: white;
+            border: 1px solid rgba(255,255,255,0.2); backdrop-filter: blur(5px);
         }
-        .label-mentah { background: #641515; border-color: #f44336; color: #ffcdd2; }
-        .label-matang { background: #1b3d1d; border-color: #4caf50; color: #c8e6c9; }
+        .label-mentah { background: rgba(139, 0, 0, 0.9); border-color: #ff5252; }
+        .label-matang { background: rgba(0, 100, 0, 0.9); border-color: #66bb6a; }
 
         .btn-capture { 
-            width: 70px; height: 70px; background: white; border: 5px solid #333;
-            border-radius: 50%; cursor: pointer; display: flex; align-items: center; 
-            justify-content: center; position: relative;
+            width: 75px; height: 75px; background: white; 
+            border: 6px solid rgba(255,255,255,0.3); border-radius: 50%; 
+            cursor: pointer; display: flex; align-items: center; justify-content: center;
         }
-        .btn-capture::after {
-            content: ''; width: 50px; height: 50px; border: 2px solid black; border-radius: 50%;
-        }
+        .btn-inner { width: 55px; height: 55px; border: 2px solid #000; border-radius: 50%; }
 
         /* Preview Overlay */
         #preview-overlay {
             display: none; position: fixed; inset: 0; background: #000; z-index: 100;
-            flex-direction: column; align-items: center; justify-content: center; padding: 20px;
+            flex-direction: column; align-items: center; justify-content: center;
         }
-        #preview-canvas { 
-            width: 100%; max-width: 350px; border-radius: 8px; 
-            box-shadow: 0 0 20px rgba(255,255,255,0.1);
+        #preview-canvas { width: 100%; height: 80%; object-fit: contain; }
+        .preview-btns { 
+            height: 20%; width: 100%; display: flex; align-items: center; 
+            justify-content: center; gap: 20px; background: #111; 
         }
-        .preview-btns { margin-top: 20px; display: flex; gap: 10px; width: 100%; max-width: 350px; }
-        .btn-p { flex: 1; padding: 14px; border-radius: 8px; border: none; font-weight: bold; }
-
-        /* Welcome */
-        #welcome-screen {
-            position: fixed; inset: 0; background: white; z-index: 200;
-            display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 30px;
-        }
+        .btn-p { padding: 15px 30px; border-radius: 10px; border: none; font-weight: bold; min-width: 120px; }
     </style>
 </head>
 <body>
 
-<div id="welcome-screen">
-    <h2 style="color: #333; margin-bottom: 20px;">🌴 Sawit Detector</h2>
-    <button onclick="startApp()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold;">MULAI</button>
-</div>
-
 <div class="app-container">
-    <div class="top-bar">
-        <span style="font-weight: bold; font-size: 14px; color: #666;">SCANNER v2.1</span>
-        <button class="btn-exit" onclick="location.reload()">Reset</button>
-    </div>
-
     <div id="webcam-container"></div>
 
-    <div class="bottom-panel">
-        <div id="label-container" class="label-status">Menunggu Kamera...</div>
-        <button class="btn-capture" onclick="captureImage()"></button>
-        <p style="font-size: 10px; color: #555;">Posisikan buah di tengah kotak</p>
+    <div class="ui-content">
+        <div class="top-bar">
+            <span style="color: white; font-weight: bold; text-shadow: 1px 1px 3px #000;">SCANNER PRO v2.5</span>
+            <button onclick="location.reload()" style="background:none; border:none; color:white; font-size:14px;">Reset</button>
+        </div>
+
+        <div class="bottom-panel">
+            <div id="label-container" class="label-status">Menghubungkan Kamera...</div>
+            <button class="btn-capture" onclick="captureImage()">
+                <div class="btn-inner"></div>
+            </button>
+            <p style="color: white; font-size: 12px; text-shadow: 1px 1px 2px #000;">Posisikan buah di tengah layar</p>
+        </div>
     </div>
 </div>
 
 <div id="preview-overlay">
     <canvas id="preview-canvas"></canvas>
     <div class="preview-btns">
-        <button class="btn-p" onclick="closePreview()" style="background:#333; color:white;">ULANGI</button>
+        <button class="btn-p" onclick="closePreview()" style="background:#444; color:white;">ULANGI</button>
         <button class="btn-p" onclick="saveImage()" style="background:var(--accent); color:white;">SIMPAN</button>
     </div>
 </div>
@@ -111,18 +116,22 @@
     const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZkvJoTy22/";
     let model, webcam, labelContainer, isPaused = false;
 
-    async function startApp() {
-        document.getElementById('welcome-screen').style.display = 'none';
+    async function init() {
         labelContainer = document.getElementById("label-container");
         try {
             model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-            // Menggunakan 320x426 (rasio 3:4) agar ringan dan tidak distorsi
-            webcam = new tmImage.Webcam(320, 426, false); 
+            
+            // Resolusi internal proses
+            webcam = new tmImage.Webcam(innerWidth, innerHeight, false); 
             await webcam.setup({ facingMode: "environment" }); 
             await webcam.play();
+            
             document.getElementById("webcam-container").appendChild(webcam.canvas);
             runAI();
-        } catch (e) { alert("Error: " + e); }
+        } catch (e) { 
+            alert("Izin kamera diperlukan!"); 
+            console.error(e);
+        }
     }
 
     async function runAI() {
@@ -140,9 +149,11 @@
 
         if (res.probability > 0.8) {
             labelContainer.innerHTML = `${res.className.toUpperCase()} (${(res.probability * 100).toFixed(0)}%)`;
-            const label = res.className.toLowerCase();
-            if (label.includes("mentah")) labelContainer.className = "label-status label-mentah";
-            else if (label.includes("matang") || label.includes("masak")) labelContainer.className = "label-status label-matang";
+            if (res.className.toLowerCase().includes("mentah")) {
+                labelContainer.className = "label-status label-mentah";
+            } else {
+                labelContainer.className = "label-status label-matang";
+            }
         } else {
             labelContainer.innerHTML = "🔍 MENCARI OBJEK...";
             labelContainer.className = "label-status";
@@ -154,20 +165,17 @@
         const canvas = document.getElementById("preview-canvas");
         const ctx = canvas.getContext("2d");
         
-        // Simpan dalam resolusi asli tanpa ditarik-tarik
         canvas.width = webcam.canvas.width;
         canvas.height = webcam.canvas.height;
         ctx.drawImage(webcam.canvas, 0, 0);
         
-        // Watermark Minimalis & Proporsional
-        const h = 40; // Tinggi area hitam sangat kecil
-        ctx.fillStyle = "rgba(0,0,0,0.7)";
-        ctx.fillRect(0, canvas.height - h, canvas.width, h);
-        
+        // Watermark Minimalis di hasil foto
+        ctx.fillStyle = "rgba(0,0,0,0.5)";
+        ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
         ctx.fillStyle = "white";
         ctx.textAlign = "center";
-        ctx.font = "bold 14px sans-serif"; // Ukuran teks proporsional
-        ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 15);
+        ctx.font = "bold 20px Arial";
+        ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 25);
 
         document.getElementById("preview-overlay").style.display = "flex";
     }
@@ -184,6 +192,9 @@
         link.href = document.getElementById("preview-canvas").toDataURL();
         link.click();
     }
+
+    // Jalankan otomatis saat web dibuka
+    window.onload = init;
 </script>
 </body>
 </html>
