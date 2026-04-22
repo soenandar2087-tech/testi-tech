@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Detektor Buah Sawit</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Segoe UI', sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding: 10px; min-height: 100vh; }
+        
+        /* Memperlebar card utama agar muat area kamera yang lebih besar */
+        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); width: 100%; max-width: 600px; text-align: center; }
+        
+        #form-container h2 { color: #1a73e8; margin-bottom: 30px; }
+        .btn-masuk { width: 100%; padding: 18px; background: #1a73e8; color: white; border: none; border-radius: 12px; font-size: 1.2em; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        
+        #camera-container { display: none; }
+        .btn-logout { width: 100%; padding: 10px; background: #6c757d; color: white; border: none; border-radius: 8px; margin-bottom: 15px; cursor: pointer; font-weight: bold; }
+
+        /* Area kamera dibuat responsif (100% dari lebar card) */
+        #webcam-container { 
+            width: 100%; 
+            aspect-ratio: 4/3; /* Rasio layar lebar */
+            background: #2c3e50; 
+            margin: 10px auto; 
+            border-radius: 10px; 
+            overflow: hidden; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            border: 3px solid #ddd; 
+        }
+        
+        #preview-container { 
+            display: none; 
+            width: 100%; 
+            aspect-ratio: 4/3; 
+            margin: 15px auto; 
+            border-radius: 10px; 
+            overflow: hidden; 
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2); 
+        }
+        
+        canvas { width: 100% !important; height: auto !important; }
+
+        .action-btn { width: 100%; padding: 14px; margin: 5px 0; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 1em; }
+        .btn-capture { background: #28a745; color: white; display: none; }
+        .btn-save { background: #17a2b8; color: white; display: none; }
+
+        .label-box { padding: 15px; border-radius: 8px; margin-top: 10px; font-size: 1.2em; font-weight: bold; transition: 0.3s; min-height: 60px; display: flex; align-items: center; justify-content: center; }
+        .label-default { background: #e8f0fe; color: #1967d2; border: 2px dashed #1967d2; }
+        .label-mentah { background: #fde8e8; color: #d32f2f; border: 2px solid #d32f2f; }
+        .label-matang { background: #e8f5e9; color: #2e7d32; border: 2px solid #2e7d32; }
+        
+        .fade-in { animation: fadeIn 0.4s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <div id="form-container" class="fade-in">
+        <h2>🌴 Sortasi Sawit AI</h2>
+        <p style="margin-bottom: 25px; color: #666;">Arahkan kamera ke buah sawit untuk mendeteksi kematangan.</p>
+        <button class="btn-masuk" id="btn-submit" onclick="masukDanMulai()">📸 BUKA KAMERA</button>
+    </div>
+
+    <div id="camera-container" class="fade-in">
+        <button class="btn-logout" onclick="logout()">⬅️ Kembali</button>
+
+        <div id="webcam-container"><span style="color: white;">Mengaktifkan Kamera...</span></div>
+        <div id="label-container" class="label-box label-default">Memuat AI...</div>
+
+        <div id="preview-container">
+            <canvas id="preview-canvas" width="640" height="480"></canvas>
+        </div>
+
+        <button class="action-btn btn-capture" id="capture-btn" onclick="captureImage()">📸 Ambil Gambar</button>
+        <button class="action-btn btn-save" id="save-btn" onclick="saveImage()">💾 Simpan Foto</button>
+    </div>
+</div>
+
+<script>
+    const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZkvJoTy22/";
+    let model, webcam, maxPredictions, previewCtx;
+    let currentLabel = "", currentProb = 0;
+
+    async function masukDanMulai() {
+        const btn = document.getElementById("btn-submit");
+        btn.disabled = true;
+        btn.innerHTML = "⏳ Memuat AI...";
+        document.getElementById("form-container").style.display = "none";
+        document.getElementById("camera-container").style.display = "block";
+        await initAI();
+    }
+
+    async function initAI() {
+        try {
+            model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+            maxPredictions = model.getTotalClasses();
+
+            // Mengubah ukuran webcam menjadi 640x480 (Wide/Landscape)
+            webcam = new tmImage.Webcam(640, 480, false); 
+            await webcam.setup({ facingMode: "environment" }); 
+            await webcam.play();
+
+            document.getElementById("webcam-container").innerHTML = "";
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            document.getElementById("capture-btn").style.display = "block";
+            
+            previewCtx = document.getElementById("preview-canvas").getContext("2d");
+            window.requestAnimationFrame(loop);
+        } catch (e) {
+            alert("Gagal mengaktifkan kamera. Pastikan izin kamera diberikan.");
+            logout();
+        }
+    }
+
+    function logout() { location.reload(); }
+
+    async function loop() {
+        webcam.update();
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        let bestLabel = "";
+        let highestProb = 0;
+
+        for (let i = 0; i < maxPredictions; i++) {
+            if (prediction[i].probability > highestProb) {
+                highestProb = prediction[i].probability;
+                bestLabel = prediction[i].className;
+            }
+        }
+
+        const lb = document.getElementById("label-container");
+        const THRESHOLD = 0.85;
+
+        if (highestProb < THRESHOLD) {
+            currentLabel = "Cari Objek";
+            currentProb = highestProb;
+            lb.innerHTML = "🔍 Cari Objek...";
+            lb.className = "label-box label-default";
+        } else {
+            currentLabel = bestLabel;
+            currentProb = highestProb;
+            lb.innerHTML = `${bestLabel} (${(highestProb * 100).toFixed(1)}%)`;
+            
+            if (bestLabel.toLowerCase().includes("mentah")) {
+                lb.className = "label-box label-mentah";
+            } else if (bestLabel.toLowerCase().includes("matang")) {
+                lb.className = "label-box label-matang";
+            } else {
+                lb.className = "label-box label-default";
+            }
+        }
+    }
+
+    function captureImage() {
+        // Sesuaikan gambar ke canvas preview berukuran 640x480
+        previewCtx.drawImage(webcam.canvas, 0, 0, 640, 480);
+        
+        // Watermark Overlay
+        previewCtx.fillStyle = "rgba(0, 0, 0, 0.6)";
+        previewCtx.fillRect(0, 400, 640, 80); 
+
+        previewCtx.fillStyle = "white";
+        previewCtx.textAlign = "left";
+        const akurasi = (currentProb * 100).toFixed(1) + "%";
+        
+        previewCtx.font = "bold 24px Arial";
+        previewCtx.fillText(`HASIL: ${currentLabel.toUpperCase()}`, 20, 435);
+        
+        const tgl = new Date().toLocaleString('id-ID', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+        previewCtx.font = "18px Arial";
+        previewCtx.fillText(`Akurasi: ${akurasi} | ${tgl}`, 20, 465);
+        
+        document.getElementById("preview-container").style.display = "block";
+        document.getElementById("save-btn").style.display = "block";
+        document.getElementById("preview-container").scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function saveImage() {
+        const link = document.createElement('a');
+        const timeStamp = new Date().getTime();
+        link.download = `Sortasi_Sawit_${timeStamp}.png`;
+        link.href = document.getElementById("preview-canvas").toDataURL("image/png");
+        link.click();
+    }
+</script>
+</body>
+</html>
