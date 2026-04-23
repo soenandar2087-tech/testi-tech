@@ -9,99 +9,43 @@
     <style>
         :root { --accent: #1a73e8; }
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        
-        body, html { 
-            height: 100%; width: 100%; background: #000; 
-            overflow: hidden; font-family: sans-serif;
-            position: fixed;
-        }
-
-        .app-container {
-            height: 100dvh; display: flex; flex-direction: column;
-        }
-
-        /* Area Kamera Full Ke Bawah */
-        #video-wrapper { 
-            flex: 1; 
-            position: relative;
-            background: #000;
-            overflow: hidden;
-        }
-        
-        #main-video { 
-            position: absolute;
-            width: 100%; height: 100%;
-            object-fit: cover; 
-        }
-
-        .bottom-panel {
-            padding: 20px 10px 30px 10px;
-            display: flex; flex-direction: column; align-items: center; 
-            gap: 15px; background: #000; z-index: 5;
-        }
-
-        .label-status { 
-            width: 90%; max-width: 320px; padding: 12px; border-radius: 8px;
-            font-size: 14px; font-weight: bold; text-align: center;
-            background: #222; border: 1px solid #333; color: white;
-            transition: all 0.3s ease;
-        }
+        body, html { height: 100%; width: 100%; background: #000; overflow: hidden; font-family: sans-serif; position: fixed; }
+        .app-container { height: 100dvh; display: flex; flex-direction: column; }
+        #video-wrapper { flex: 1; position: relative; background: #000; overflow: hidden; }
+        #main-video { position: absolute; width: 100%; height: 100%; object-fit: cover; }
+        .bottom-panel { padding: 20px 10px 30px 10px; display: flex; flex-direction: column; align-items: center; gap: 15px; background: #000; z-index: 5; }
+        .label-status { width: 90%; max-width: 320px; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; background: #222; border: 1px solid #333; color: white; transition: all 0.3s ease; }
         .label-mentah { background: #641515; border-color: #f44336; }
         .label-matang { background: #1b3d1d; border-color: #4caf50; }
-
-        .btn-capture { 
-            width: 70px; height: 70px; background: white; border: 5px solid #333;
-            border-radius: 50%; outline: none; cursor: pointer;
-        }
+        .btn-capture { width: 70px; height: 70px; background: white; border: 5px solid #333; border-radius: 50%; outline: none; cursor: pointer; }
         .btn-capture:active { transform: scale(0.9); }
-
-        #preview-overlay {
-            display: none; position: fixed; inset: 0; background: #000; z-index: 100;
-            flex-direction: column; align-items: center; justify-content: center; padding: 20px;
-        }
+        #preview-overlay { display: none; position: fixed; inset: 0; background: #000; z-index: 100; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
         #preview-canvas { width: 100%; max-width: 350px; border-radius: 8px; border: 1px solid #333; }
-        
         .preview-btns { margin-top: 20px; display: flex; gap: 10px; width: 100%; max-width: 350px; }
-        .btn-p { 
-            flex: 1; padding: 15px; border-radius: 8px; border: none; 
-            font-weight: bold; color: white; cursor: pointer; transition: 0.3s;
-        }
-        .btn-p:active { transform: scale(0.95); opacity: 0.8; }
-
-        #welcome {
-            position: fixed; inset: 0; background: white; z-index: 200;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-        }
+        .btn-p { flex: 1; padding: 15px; border-radius: 8px; border: none; font-weight: bold; color: white; cursor: pointer; transition: 0.3s; }
+        #welcome { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        
+        /* Style Slider Zoom */
+        .zoom-container { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10; width: 65%; background: rgba(0,0,0,0.5); padding: 10px 15px; border-radius: 25px; backdrop-filter: blur(5px); display: none; align-items: center; gap: 10px; }
     </style>
 </head>
 <body>
 
 <div id="welcome">
-    <p style="color: #666; margin-bottom: 20px; font-size: 14px; font-weight: normal;">
-    🌴 Sortasi Buah Matang VS Buah Mentah
-</p>
+    <p style="color: #666; margin-bottom: 20px; font-size: 14px;">🌴 Sortasi Buah Matang VS Buah Mentah</p>
     <button onclick="init()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold; cursor:pointer;">MULAI SCANNER</button>
 </div>
 
 <div class="app-container">
     <div id="video-wrapper">
-        <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 10; width: 70%; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 20px;">
-    <input type="range" id="zoom-slider" min="1" max="1" step="0.1" value="1" style="width: 100%;">
-</div>
+        <div id="zoom-area" class="zoom-container">
+            <span style="color: white; font-size: 10px;">1x</span>
+            <input type="range" id="zoom-slider" min="1" max="1" step="0.1" value="1" style="flex: 1; accent-color: var(--accent);">
+            <span style="color: white; font-size: 10px;" id="zoom-max-label">?</span>
+        </div>
         <video id="main-video" autoplay playsinline muted></video>
     </div>
 
-    <div class="app-container">
-    <div id="video-wrapper">
-        <div style="position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10; width: 60%; background: rgba(0,0,0,0.3); padding: 8px 15px; border-radius: 20px; backdrop-filter: blur(5px); display: flex; align-items: center; gap: 10px;">
-            <span style="color: white; font-size: 12px; font-weight: bold;">1x</span>
-            <input type="range" id="zoom-slider" min="1" max="1" step="0.1" value="1" style="flex: 1; accent-color: var(--accent);">
-            <span style="color: white; font-size: 12px; font-weight: bold;" id="zoom-max-label">?</span>
-        </div>
-        
-        <video id="main-video" autoplay playsinline muted></video>
-    </div>
-    
     <div class="bottom-panel">
         <div id="label-container" class="label-status">Menghubungkan Kamera...</div>
         <button class="btn-capture" onclick="takePhoto()"></button>
@@ -111,50 +55,59 @@
 <div id="preview-overlay">
     <canvas id="preview-canvas"></canvas>
     <div class="preview-btns">
-        <button id="btn-ulangi" class="btn-p" onclick="reset()" style="background:#333;">ULANGI</button>
+        <button class="btn-p" onclick="reset()" style="background:#333;">ULANGI</button>
         <button id="btn-simpan" class="btn-p" onclick="save()" style="background:var(--accent);">SIMPAN</button>
     </div>
 </div>
 
 <script>
     const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZkvJoTy22/";
-    let model, video, labelContainer, isActive = true;
+    let model, video, labelContainer, track, isActive = true;
 
     async function init() {
         document.getElementById('welcome').style.display = 'none';
         video = document.getElementById('main-video');
         labelContainer = document.getElementById('label-container');
-        // Di dalam async function init() ...
-const capabilities = track.getCapabilities();
-if (capabilities.zoom) {
-    zoomSlider.min = capabilities.zoom.min;
-    zoomSlider.max = capabilities.zoom.max;
-    zoomSlider.step = capabilities.zoom.step;
-    zoomSlider.value = capabilities.zoom.min;
-    
-    // Update label angka maksimal zoom di UI
-    document.getElementById('zoom-max-label').innerText = capabilities.zoom.max + 'x';
+        const zoomSlider = document.getElementById('zoom-slider');
+        const zoomArea = document.getElementById('zoom-area');
 
-    zoomSlider.addEventListener('input', () => {
-        track.applyConstraints({
-            advanced: [{ zoom: zoomSlider.value }]
-        });
-    });
-}
- 
         try {
+            // 1. Load Model Dulu
             model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
+            
+            // 2. Minta akses kamera
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { facingMode: "environment" }, 
                 audio: false 
             });
+            
             video.srcObject = stream;
+            track = stream.getVideoTracks()[0];
+
+            // 3. BARU CEK FITUR ZOOM SETELAH KAMERA AKTIF
+            const capabilities = track.getCapabilities();
+            if (capabilities.zoom) {
+                zoomArea.style.display = 'flex';
+                zoomSlider.min = capabilities.zoom.min;
+                zoomSlider.max = capabilities.zoom.max;
+                zoomSlider.step = capabilities.zoom.step;
+                zoomSlider.value = capabilities.zoom.min;
+                document.getElementById('zoom-max-label').innerText = capabilities.zoom.max + 'x';
+
+                zoomSlider.addEventListener('input', () => {
+                    track.applyConstraints({ advanced: [{ zoom: zoomSlider.value }] });
+                });
+            }
+
             predictLoop();
-        } catch (e) { alert("Izin kamera diperlukan: " + e); }
+        } catch (e) { 
+            alert("Error: " + e); 
+            console.error(e);
+        }
     }
 
     async function predictLoop() {
-        if (isActive) {
+        if (isActive && model) {
             const prediction = await model.predict(video);
             prediction.sort((a, b) => b.probability - a.probability);
             const res = prediction[0];
@@ -163,21 +116,12 @@ if (capabilities.zoom) {
                 const namaLabel = res.className.toUpperCase();
                 const persen = (res.probability * 100).toFixed(0);
                 labelContainer.innerHTML = `${namaLabel} (${persen}%)`;
-                
-                if (res.className.toLowerCase().includes("mentah")) {
-                    labelContainer.className = "label-status label-mentah";
-                } else {
-                    labelContainer.className = "label-status label-matang";
-                }
+                labelContainer.className = res.className.toLowerCase().includes("mentah") ? "label-status label-mentah" : "label-status label-matang";
             } else {
                 labelContainer.innerHTML = "🔍 MENCARI OBJEK...";
                 labelContainer.className = "label-status";
             }
-            
-            // Jeda agar HP tidak panas/crash
-            setTimeout(() => {
-                requestAnimationFrame(predictLoop);
-            }, 250);
+            setTimeout(() => requestAnimationFrame(predictLoop), 250);
         }
     }
 
@@ -185,23 +129,18 @@ if (capabilities.zoom) {
         isActive = false;
         const canvas = document.getElementById("preview-canvas");
         const ctx = canvas.getContext("2d");
-
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0);
 
-        // Watermark Box
         const now = new Date();
         const info = `${now.toLocaleDateString('id-ID')} | ${now.toLocaleTimeString('id-ID')}`;
-        
         ctx.fillStyle = "rgba(0,0,0,0.6)";
         ctx.fillRect(0, canvas.height - 65, canvas.width, 65);
-        
         ctx.fillStyle = "white";
         ctx.textAlign = "center";
         ctx.font = "bold 22px sans-serif";
         ctx.fillText(labelContainer.innerText, canvas.width/2, canvas.height - 38);
-        
         ctx.font = "14px sans-serif";
         ctx.fillStyle = "#ddd";
         ctx.fillText(info, canvas.width/2, canvas.height - 15);
@@ -217,35 +156,23 @@ if (capabilities.zoom) {
 
     function save() {
         const btnSimpan = document.getElementById("btn-simpan");
-        const originalText = "SIMPAN";
-        
-        // Visual Feedback
         btnSimpan.innerText = "💾 MENYIMPAN...";
-        btnSimpan.style.background = "#555";
         btnSimpan.disabled = true;
-
         try {
             const link = document.createElement('a');
             link.download = `Sawit_${Date.now()}.png`;
             link.href = document.getElementById("preview-canvas").toDataURL("image/png");
             link.click();
-
-            // Beri tanda berhasil
             setTimeout(() => {
                 btnSimpan.innerText = "✅ BERHASIL!";
-                btnSimpan.style.background = "#2e7d32";
-                
                 setTimeout(() => {
-                    btnSimpan.innerText = originalText;
-                    btnSimpan.style.background = "var(--accent)";
+                    btnSimpan.innerText = "SIMPAN";
                     btnSimpan.disabled = false;
-                    reset(); // Otomatis balik ke kamera
+                    reset();
                 }, 1000);
             }, 500);
-            
         } catch (e) {
             alert("Gagal simpan: " + e);
-            btnSimpan.innerText = originalText;
             btnSimpan.disabled = false;
         }
     }
