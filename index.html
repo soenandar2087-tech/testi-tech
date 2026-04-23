@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Sawit AI v3.1 Final</title>
+    <title>Sawit AI v3.2 Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
     <style>
@@ -13,26 +13,32 @@
         .app-container { height: 100dvh; display: flex; flex-direction: column; }
         #video-wrapper { flex: 1; position: relative; background: #000; overflow: hidden; }
         #main-video { position: absolute; width: 100%; height: 100%; object-fit: cover; }
+        
+        /* Zoom Slider */
+        .zoom-container { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10; width: 65%; background: rgba(0,0,0,0.5); padding: 10px 15px; border-radius: 25px; backdrop-filter: blur(5px); display: none; align-items: center; gap: 10px; }
+        
         .bottom-panel { padding: 20px 10px 30px 10px; display: flex; flex-direction: column; align-items: center; gap: 15px; background: #000; z-index: 5; }
+        
         .label-status { width: 90%; max-width: 320px; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: bold; text-align: center; background: #222; border: 1px solid #333; color: white; transition: all 0.3s ease; }
+        
+        /* Warna Label Per Kategori */
         .label-mentah { background: #641515; border-color: #f44336; }
         .label-matang { background: #1b3d1d; border-color: #4caf50; }
+        .label-busuk { background: #3e2723; border-color: #795548; }
+        .label-brondolan { background: #827717; border-color: #fbc02d; }
+
         .btn-capture { width: 70px; height: 70px; background: white; border: 5px solid #333; border-radius: 50%; outline: none; cursor: pointer; }
-        .btn-capture:active { transform: scale(0.9); }
         #preview-overlay { display: none; position: fixed; inset: 0; background: #000; z-index: 100; flex-direction: column; align-items: center; justify-content: center; padding: 20px; }
         #preview-canvas { width: 100%; max-width: 350px; border-radius: 8px; border: 1px solid #333; }
         .preview-btns { margin-top: 20px; display: flex; gap: 10px; width: 100%; max-width: 350px; }
-        .btn-p { flex: 1; padding: 15px; border-radius: 8px; border: none; font-weight: bold; color: white; cursor: pointer; transition: 0.3s; }
+        .btn-p { flex: 1; padding: 15px; border-radius: 8px; border: none; font-weight: bold; color: white; cursor: pointer; }
         #welcome { position: fixed; inset: 0; background: white; z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-        
-        /* Style Slider Zoom */
-        .zoom-container { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 10; width: 65%; background: rgba(0,0,0,0.5); padding: 10px 15px; border-radius: 25px; backdrop-filter: blur(5px); display: none; align-items: center; gap: 10px; }
     </style>
 </head>
 <body>
 
 <div id="welcome">
-    <p style="color: #666; margin-bottom: 20px; font-size: 14px;">🌴 Sortasi Buah Matang VS Buah Mentah</p>
+    <p style="color: #666; margin-bottom: 20px; font-size: 14px;">🌴 Sortasi Multi-Kriteria Sawit AI</p>
     <button onclick="init()" style="padding:15px 40px; background:var(--accent); color:white; border:none; border-radius:30px; font-weight:bold; cursor:pointer;">MULAI SCANNER</button>
 </div>
 
@@ -61,7 +67,8 @@
 </div>
 
 <script>
-    const MODEL_URL = "https://teachablemachine.withgoogle.com/models/ZkvJoTy22/";
+    // LINK MODEL TERBARU KAMU
+    const MODEL_URL = "https://teachablemachine.withgoogle.com/models/G6KxMBq4r/";
     let model, video, labelContainer, track, isActive = true;
 
     async function init() {
@@ -72,19 +79,11 @@
         const zoomArea = document.getElementById('zoom-area');
 
         try {
-            // 1. Load Model Dulu
             model = await tmImage.load(MODEL_URL + "model.json", MODEL_URL + "metadata.json");
-            
-            // 2. Minta akses kamera
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: "environment" }, 
-                audio: false 
-            });
-            
+            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
             video.srcObject = stream;
             track = stream.getVideoTracks()[0];
 
-            // 3. BARU CEK FITUR ZOOM SETELAH KAMERA AKTIF
             const capabilities = track.getCapabilities();
             if (capabilities.zoom) {
                 zoomArea.style.display = 'flex';
@@ -93,17 +92,12 @@
                 zoomSlider.step = capabilities.zoom.step;
                 zoomSlider.value = capabilities.zoom.min;
                 document.getElementById('zoom-max-label').innerText = capabilities.zoom.max + 'x';
-
                 zoomSlider.addEventListener('input', () => {
                     track.applyConstraints({ advanced: [{ zoom: zoomSlider.value }] });
                 });
             }
-
             predictLoop();
-        } catch (e) { 
-            alert("Error: " + e); 
-            console.error(e);
-        }
+        } catch (e) { alert("Error Kamera: " + e); }
     }
 
     async function predictLoop() {
@@ -112,11 +106,23 @@
             prediction.sort((a, b) => b.probability - a.probability);
             const res = prediction[0];
 
-            if (res.probability > 0.75) {
+            if (res.probability > 0.80) { // Threshold 80% agar lebih akurat
+                const labelKecil = res.className.toLowerCase();
                 const namaLabel = res.className.toUpperCase();
                 const persen = (res.probability * 100).toFixed(0);
-                labelContainer.innerHTML = `${namaLabel} (${persen}%)`;
-                labelContainer.className = res.className.toLowerCase().includes("mentah") ? "label-status label-mentah" : "label-status label-matang";
+
+                // Logika Filter untuk Class "Lainnya" atau "Kosong"
+                if (labelKecil.includes("lainnya") || labelKecil.includes("kosong")) {
+                    labelContainer.innerHTML = "🔍 MENCARI OBJEK...";
+                    labelContainer.className = "label-status";
+                } else {
+                    labelContainer.innerHTML = `${namaLabel} (${persen}%)`;
+                    // Atur Warna Berdasarkan Nama Class
+                    if (labelKecil.includes("mentah")) labelContainer.className = "label-status label-mentah";
+                    else if (labelKecil.includes("matang")) labelContainer.className = "label-status label-matang";
+                    else if (labelKecil.includes("busuk")) labelContainer.className = "label-status label-busuk";
+                    else if (labelKecil.includes("brondolan")) labelContainer.className = "label-status label-brondolan";
+                }
             } else {
                 labelContainer.innerHTML = "🔍 MENCARI OBJEK...";
                 labelContainer.className = "label-status";
@@ -160,7 +166,7 @@
         btnSimpan.disabled = true;
         try {
             const link = document.createElement('a');
-            link.download = `Sawit_${Date.now()}.png`;
+            link.download = `SawitAI_${Date.now()}.png`;
             link.href = document.getElementById("preview-canvas").toDataURL("image/png");
             link.click();
             setTimeout(() => {
@@ -171,10 +177,7 @@
                     reset();
                 }, 1000);
             }, 500);
-        } catch (e) {
-            alert("Gagal simpan: " + e);
-            btnSimpan.disabled = false;
-        }
+        } catch (e) { alert("Gagal simpan: " + e); btnSimpan.disabled = false; }
     }
 </script>
 </body>
